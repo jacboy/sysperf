@@ -53,8 +53,50 @@ fi
 # current directory so the I/O test still measures that disk, but with an unpredictable
 # name and mode 0700, so other local users can't pre-plant files or symlinks in it.
 WORKDIR=$( mktemp -d "${PWD}/.sysperf.XXXXXXXX" ) || { echo "Error: cannot create a working directory in ${PWD}"; exit 1; }
-trap 'rm -rf -- "$WORKDIR"' EXIT
+trap 'spinner_stop; rm -rf -- "$WORKDIR"' EXIT
 trap 'exit 130' INT TERM
+
+# Progress spinner, so it's visible that a long step is still running. It is drawn on
+# the terminal (/dev/tty) only, never on stdout, so "| tee log" output stays clean.
+# Without a terminal (e.g. cron) it is skipped.
+SPIN_PID=""
+if { : > /dev/tty; } 2>/dev/null; then
+    exec 3> /dev/tty
+    SPIN_TTY=1
+else
+    SPIN_TTY=0
+fi
+if [[ "${LC_ALL:-${LC_CTYPE:-${LANG:-}}}" =~ [Uu][Tt][Ff]-?8 ]]; then
+    SPIN_FRAMES=(⠋ ⠙ ⠹ ⠸ ⠼ ⠴ ⠦ ⠧ ⠇ ⠏)
+else
+    SPIN_FRAMES=('|' '/' '-' '\')
+fi
+
+spinner_start() {
+    [ "$SPIN_TTY" = 1 ] || return 0
+    spinner_stop
+    local label=$1
+    (
+        trap 'exit 0' TERM
+        # Short delay so the previous result line is printed (e.g. through tee) first
+        sleep 0.3
+        local i=0 start=$SECONDS
+        while :; do
+            printf '\r\033[K\033[0;36m%s\033[0m %s (%ss)' "${SPIN_FRAMES[i % ${#SPIN_FRAMES[@]}]}" "$label" "$(( SECONDS - start ))" >&3
+            i=$(( i + 1 ))
+            sleep 0.2
+        done
+    ) &
+    SPIN_PID=$!
+}
+
+spinner_stop() {
+    [ -n "$SPIN_PID" ] || return 0
+    kill "$SPIN_PID" 2>/dev/null
+    wait "$SPIN_PID" 2>/dev/null
+    SPIN_PID=""
+    printf '\r\033[K' >&3
+}
 
 # Test IPv6 connectivity
 ipv6=$( wget -qO- -t1 -T2 https://ipv6.icanhazip.com )
@@ -113,7 +155,9 @@ next() {
 speed_test() {
     # One attempt; give up on an unreachable address after 5s (wget then tries the host's
     # next address, e.g. IPv4 when the host's IPv6 is dead) and on a stalled transfer after 30s
+    spinner_start "Downloading 100 MB from $2"
     local output=$(LANG=C wget -O /dev/null -t1 --connect-timeout=5 --read-timeout=30 "$1" 2>&1)
+    spinner_stop
     local speedtest=$(printf '%s' "$output" | awk '/\/dev\/null/ {speed=$3 $4} END {gsub(/\(|\)/,"",speed); print speed}')
     [ -z "$speedtest" ] && speedtest="failed"
     local nodeName=$2
@@ -155,9 +199,11 @@ region() {
 
 ping_test() {
     local nodename=$2
+    spinner_start "Pinging $2"
     local output=$(ping -w 2 "$1" 2>/dev/null | grep rtt | cut -d'/' -f4 | awk '{ print $3 }')
     # Some test hosts publish an IPv6 address that doesn't answer; retry over IPv4
     [ -z "$output" ] && output=$(ping -4 -w 2 "$1" 2>/dev/null | grep rtt | cut -d'/' -f4 | awk '{ print $3 }')
+    spinner_stop
     if [ -n "$output" ]; then output="$output ms"; else output="failed"; fi
     printf "${YELLOW}%-32s${GREEN}%-24s${RED}%-14s${PLAIN}\n" "${nodename}" "${output}"
 }
@@ -197,13 +243,16 @@ geekbench5() {
       echo "Error: Not enough memory available. Geekbench 5 requires as least 2GB"
       return 1
   fi
-	echo -e "Running Geekbench5 CPU Benchmark. This will take a few minutes..."
 	echo -e "Note: Geekbench uploads the result and basic system information to the public Geekbench Browser."
 	local GEEKBENCH_DL_URL="https://cdn.geekbench.com/Geekbench-5.1.0-Linux.tar.gz"
 	local GEEKBENCH_SHA256="e3b6516df532f94038340ab3ae6f31331c357636f32d46b1ebf9e105cbe418c3"
 	local GEEKBENCH_TARBALL="$WORKDIR/geekbench.tar.gz"
 	local GEEKBENCH_PATH="$WORKDIR/geekbench"
-	if ! curl -fsSL --proto '=https' --max-time 300 -o "$GEEKBENCH_TARBALL" "$GEEKBENCH_DL_URL"; then
+	spinner_start "Downloading Geekbench 5"
+	curl -fsSL --proto '=https' --max-time 300 -o "$GEEKBENCH_TARBALL" "$GEEKBENCH_DL_URL"
+	local rc=$?
+	spinner_stop
+	if [ "$rc" -ne 0 ]; then
 		echo "Error: Geekbench download failed, skipping the CPU benchmark"
 		return 1
 	fi
@@ -216,18 +265,21 @@ geekbench5() {
 		echo "Error: could not extract Geekbench, skipping the CPU benchmark"
 		return 1
 	fi
+	spinner_start "Running Geekbench 5 CPU benchmark, this takes a few minutes"
 	GEEKBENCH_TEST=$("$GEEKBENCH_PATH/geekbench5" | grep "https://browser")
+	spinner_stop
 	GEEKBENCH_URL=$(echo "$GEEKBENCH_TEST" | head -1 | awk '{ print $1 }')
 	if [[ ! "$GEEKBENCH_URL" =~ ^https://browser\.geekbench\.com/[A-Za-z0-9/]+$ ]]; then
 		echo "Error: could not get the Geekbench result URL"
 		return 1
 	fi
+	spinner_start "Fetching Geekbench scores"
 	sleep 10
 	GEEKBENCH_PAGE=$(curl -fsS --proto '=https' --max-time 30 "$GEEKBENCH_URL")
+	spinner_stop
 	GEEKBENCH_SCORES=$(echo "$GEEKBENCH_PAGE" | grep "class='score'" | head -2 | tr -d \'\" | sed 's/class=score//g' | sed "s/ //g" | sed -n 's:.*<div>\(.*\)</div>.*:\1:p' | tr -cd '0-9\n')
 	GEEKBENCH_SCORES_SINGLE=$(echo "$GEEKBENCH_SCORES" | sed -n 1p)
 	GEEKBENCH_SCORES_MULTI=$(echo "$GEEKBENCH_SCORES" | sed -n 2p)
-	echo -ne "\e[1A"; echo -ne "\033[0K\r"
 	echo -e "Geekbench v5"
 	echo -e "Single Core          :" "${BLUE}" "$GEEKBENCH_SCORES_SINGLE" "${PLAIN}"
 	echo -e "Multi Core           :" "${YELLOW}" "$GEEKBENCH_SCORES_MULTI" "${PLAIN}"
@@ -272,8 +324,10 @@ clear
 next
 echo -e "${RED}getsysperf.com${PLAIN} -- ${YELLOW}https://github.com/iandk/sysperf${PLAIN}"
 next
+spinner_start "Collecting system information"
 get_netinfo
 get_sys_type
+spinner_stop
 echo -e "System type          : ${BLUE}$sys_type${PLAIN}"
 echo -e "CPU model            : ${BLUE}$cname${PLAIN}"
 echo -e "Number of cores      : ${BLUE}$cores${PLAIN}"
@@ -294,11 +348,17 @@ else
 echo -e "IPv6 Support         : ${BLUE}No${PLAIN}"
 fi
 next
+spinner_start "Running I/O test (1st run)"
 io1=$( io_test )
+spinner_stop
 echo -e "I/O bandwidth (1st run)  : ${YELLOW}$io1${PLAIN}"
+spinner_start "Running I/O test (2nd run)"
 io2=$( io_test )
+spinner_stop
 echo -e "I/O bandwidth (2nd run)  : ${YELLOW}$io2${PLAIN}"
+spinner_start "Running I/O test (3rd run)"
 io3=$( io_test )
+spinner_stop
 echo -e "I/O bandwidth (3rd run)  : ${YELLOW}$io3${PLAIN}"
 rawio1=$( echo $io1 | sed 's/MB//g' | sed 's/s//g' | sed 's/.$//')
 rawio2=$( echo $io2 | sed 's/MB//g' | sed 's/s//g' | sed 's/.$//')
