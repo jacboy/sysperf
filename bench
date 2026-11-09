@@ -46,7 +46,7 @@ if ! command -v wget >/dev/null || ! command -v fio >/dev/null || ! command -v c
     # Read from the terminal: when run as "wget -qO- ... | bash", stdin is the script itself
     read -n 1 -r -s -p "Please press enter to install the required packages automatically" < /dev/tty
     echo
-    apt update && apt install -y ca-certificates curl jq fio wget iputils-ping sysbench || exit 1
+    apt-get update && apt-get install -y ca-certificates curl jq fio wget iputils-ping sysbench || exit 1
 fi
 
 # Private working directory for the I/O test file and Geekbench. It is created in the
