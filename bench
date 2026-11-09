@@ -121,6 +121,7 @@ speed_test() {
 }
 
 speed_result() {
+    region 'Europe'
     speed_test 'https://fra-de-ping.vultr.com/vultr.com.100MB.bin' 'Frankfurt, Vultr'
     speed_test 'http://fsn.icmp.hetzner.com/100MB.bin' 'Falkenstein, Hetzner'
     speed_test 'https://nbg1-speed.hetzner.com/100MB.bin' 'Nuremberg, Hetzner'
@@ -129,11 +130,27 @@ speed_result() {
     speed_test 'https://ams.lg.core-backbone.com/files/100MB.test' 'Amsterdam, Core-Backbone'
     speed_test 'https://lon-gb-ping.vultr.com/vultr.com.100MB.bin' 'London, Vultr'
     speed_test 'https://par-fr-ping.vultr.com/vultr.com.100MB.bin' 'Paris, Vultr'
+    region 'North America'
     speed_test 'https://nj-us-ping.vultr.com/vultr.com.100MB.bin' 'New Jersey, Vultr'
     speed_test 'http://ash.icmp.hetzner.com/100MB.bin' 'Ashburn, Hetzner'
     speed_test 'https://tx-us-ping.vultr.com/vultr.com.100MB.bin' 'Texas, Vultr'
     speed_test 'https://sjo-ca-us-ping.vultr.com/vultr.com.100MB.bin' 'Silicon Valley, Vultr'
+    region 'South America'
+    speed_test 'https://sao-br-ping.vultr.com/vultr.com.100MB.bin' 'Sao Paulo, Vultr'
+    region 'Africa'
+    speed_test 'https://jnb-za-ping.vultr.com/vultr.com.100MB.bin' 'Johannesburg, Vultr'
+    region 'Asia'
     speed_test 'https://sgp-ping.vultr.com/vultr.com.100MB.bin' 'Singapore, Vultr'
+    speed_test 'https://hnd-jp-ping.vultr.com/vultr.com.100MB.bin' 'Tokyo, Vultr'
+    speed_test 'https://bom-in-ping.vultr.com/vultr.com.100MB.bin' 'Mumbai, Vultr'
+    region 'Oceania'
+    speed_test 'https://syd-au-ping.vultr.com/vultr.com.100MB.bin' 'Sydney, Vultr'
+}
+
+# Continent heading for the latency and speed tables
+region() {
+    printf "${BLUE}%s${PLAIN}
+" "$1"
 }
 
 ping_test() {
@@ -146,11 +163,20 @@ ping_test() {
 }
 
 ping_result() {
+  region 'Europe'
   ping_test 'fra-de-ping.vultr.com' 'Frankfurt'
+  region 'North America'
   ping_test 'nj-us-ping.vultr.com' 'New Jersey'
   ping_test 'sjo-ca-us-ping.vultr.com' 'Silicon Valley'
+  region 'South America'
+  ping_test 'sao-br-ping.vultr.com' 'Sao Paulo'
+  region 'Africa'
+  ping_test 'jnb-za-ping.vultr.com' 'Johannesburg'
+  region 'Asia'
   ping_test 'sgp-ping.vultr.com' 'Singapore'
   ping_test 'hnd-jp-ping.vultr.com' 'Tokyo'
+  region 'Oceania'
+  ping_test 'syd-au-ping.vultr.com' 'Sydney'
 }
 
 io_test() {
