@@ -1,0 +1,170 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>sysperf · Linux server benchmark</title>
+<meta name="description" content="Benchmark a Debian or Ubuntu server with one command: disk I/O, latency and download speed to 34 locations on six continents, and CPU. Open source, nothing uploaded.">
+<meta name="color-scheme" content="light dark">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<header class="site-header">
+  <div class="wrap header-inner">
+    <a class="logo" href="/" aria-label="sysperf home"><span class="logo-prompt">$</span> sysperf</a>
+    <nav aria-label="Main">
+      <a href="#measures">What it measures</a>
+      <a href="#options">Options</a>
+      <a href="#trust">Before you run</a>
+      <a href="https://github.com/jacboy/sysperf">GitHub</a>
+    </nav>
+  </div>
+</header>
+
+<main>
+  <section class="hero">
+    <div class="wrap">
+      <h1>Benchmark your Linux server with one command.</h1>
+      <p class="lead">Disk I/O, latency and download speed to 34 locations on six continents, and CPU performance. Open source, cleans up after itself, uploads nothing.</p>
+
+      <div class="cmd" data-copy-group>
+        <div class="cmd-tabs" role="tablist" aria-label="Download tool">
+          <button type="button" role="tab" aria-selected="true" data-tab="curl">curl</button>
+          <button type="button" role="tab" aria-selected="false" data-tab="wget">wget</button>
+        </div>
+        <div class="cmd-line">
+          <code data-panel="curl"><span class="cmd-prompt" aria-hidden="true">$</span><span data-copy-text>curl -fsSL https://getsysperf.com/bench | bash</span></code>
+          <code data-panel="wget" hidden><span class="cmd-prompt" aria-hidden="true">$</span><span data-copy-text>wget -qO- https://getsysperf.com/bench | bash</span></code>
+          <button type="button" class="copy" data-copy>Copy</button>
+        </div>
+      </div>
+
+      <ul class="facts">
+        <li>Debian 10+ · Ubuntu 18.04+</li>
+        <li>x86_64 and ARM</li>
+        <li>About 8–10 minutes</li>
+        <li>Version __VERSION__</li>
+      </ul>
+    </div>
+  </section>
+
+  <section id="measures" class="wrap section">
+    <h2>What it measures</h2>
+    <div class="cards">
+      <article class="card">
+        <h3>System</h3>
+        <p>CPU model, cores and frequency, RAM, swap, disk size, OS, kernel, virtualization type, ISP and ASN, and whether IPv6 works.</p>
+      </article>
+      <article class="card">
+        <h3>Disk</h3>
+        <p>Three 30-second <a href="https://github.com/axboe/fio">fio</a> runs: random read/write, 512 KB blocks, queue depth 64, direct I/O. Measures the disk of the directory you run it from.</p>
+      </article>
+      <article class="card">
+        <h3>Network</h3>
+        <p>Latency to 12 cities and download speed from 34 hosts of 8 providers, grouped by continent, plus the nearest CDN node. 100 MB or 15 seconds per host.</p>
+      </article>
+      <article class="card">
+        <h3>CPU</h3>
+        <p><a href="https://github.com/akopytov/sysbench">sysbench</a> on one thread and on all threads. Optionally <a href="#options">Geekbench 7</a> as well.</p>
+      </article>
+    </div>
+  </section>
+
+  <section class="wrap section">
+    <h2>Example output</h2>
+    <p class="muted">Debian 13, 2 vCPU KVM in Frankfurt. Shortened.</p>
+<pre class="terminal" tabindex="0"><code><span class="t-dim">-----</span>
+<span class="t-red">getsysperf.com</span> v__VERSION__ -- <span class="t-yellow">https://github.com/jacboy/sysperf</span>
+<span class="t-dim">-----</span>
+System type          : <span class="t-cyan">KVM</span>
+CPU model            : <span class="t-cyan">AMD EPYC 7702 64-Core Processor</span>
+Number of cores      : <span class="t-cyan">2</span>
+Total amount of Mem  : <span class="t-cyan">3922 MB (443 MB Used)</span>
+OS                   : <span class="t-cyan">Debian GNU/Linux 13</span>
+IPv6 Support         : <span class="t-cyan">Yes</span>
+<span class="t-dim">-----</span>
+Average I/O bandwidth    : <span class="t-yellow">6950.7 MB/s</span>
+<span class="t-dim">-----</span>
+Location                        Latency
+<span class="t-cyan">Europe</span>
+<span class="t-yellow">Frankfurt</span>                       <span class="t-green">1.316 ms</span>
+<span class="t-cyan">North America</span>
+<span class="t-yellow">New York</span>                        <span class="t-green">90.268 ms</span>
+<span class="t-cyan">Oceania</span>
+<span class="t-yellow">Sydney</span>                          <span class="t-green">266.864 ms</span>
+<span class="t-dim">-----</span>
+Location                        Speed
+<span class="t-cyan">Europe</span>
+<span class="t-yellow">Frankfurt, Leaseweb</span>             <span class="t-green">498.5 MB/s</span>
+<span class="t-yellow">Zurich, Init7</span>                   <span class="t-green">295.3 MB/s</span>
+<span class="t-cyan">Asia</span>
+<span class="t-yellow">Singapore, Hetzner</span>              <span class="t-green">16.7 MB/s</span>
+<span class="t-cyan">Global (nearest CDN node)</span>
+<span class="t-yellow">CacheFly</span>                        <span class="t-green">418.2 MB/s</span>
+<span class="t-dim">-----</span>
+CPU benchmark (sysbench, events per second, higher is better)
+Single Core          : <span class="t-cyan">610.30</span>
+Multi Core           : <span class="t-yellow">1229.58</span> (2 threads)</code></pre>
+  </section>
+
+  <section id="options" class="wrap section">
+    <h2>Options</h2>
+    <p>Add Geekbench 7 to the CPU test by putting <code>GEEKBENCH=7</code> in front of <strong>bash</strong>, not in front of curl:</p>
+    <div class="cmd cmd-small" data-copy-group>
+      <div class="cmd-line">
+        <code><span class="cmd-prompt" aria-hidden="true">$</span><span data-copy-text>curl -fsSL https://getsysperf.com/bench | GEEKBENCH=7 bash</span></code>
+        <button type="button" class="copy" data-copy>Copy</button>
+      </div>
+    </div>
+    <ul class="notes">
+      <li>A 462 MB download, verified against a pinned SHA-256 checksum before it runs. Needs about 1.5 GB free disk and 2 GB RAM, otherwise it's skipped.</li>
+      <li>The free Geekbench version uploads its result and basic system information to the public <a href="https://browser.geekbench.com/">Geekbench Browser</a>. Without <code>GEEKBENCH=7</code>, nothing is uploaded anywhere.</li>
+      <li>Adds 5–10 minutes to the run.</li>
+    </ul>
+  </section>
+
+  <section id="trust" class="wrap section">
+    <h2>Before you run it</h2>
+    <p>Piping a script into bash means trusting it. The script is short, readable and open source. You can download and read it first:</p>
+    <div class="cmd cmd-small" data-copy-group>
+      <div class="cmd-line">
+        <code><span class="cmd-prompt" aria-hidden="true">$</span><span data-copy-text>curl -fsSLO https://getsysperf.com/bench &amp;&amp; less bench &amp;&amp; bash bench</span></code>
+        <button type="button" class="copy" data-copy>Copy</button>
+      </div>
+    </div>
+    <p>SHA-256 of version __VERSION__ (also at <a href="/bench.sha256">/bench.sha256</a>):</p>
+    <p class="hash"><code>__SHA256__</code></p>
+
+    <div class="cards two">
+      <article class="card">
+        <h3>What it does to your system</h3>
+        <ul>
+          <li>Installs missing packages from your distribution with <code>apt-get</code>, after asking: curl, wget, jq, fio, ping, sysbench. Root is only needed for that.</li>
+          <li>Writes temporary files to a private <code>.sysperf.*</code> directory in the current directory and removes it at the end, also on Ctrl+C.</li>
+          <li>If the download breaks off, nothing runs: the script only starts on its last line.</li>
+        </ul>
+      </article>
+      <article class="card">
+        <h3>Who it talks to</h3>
+        <ul>
+          <li><code>ipinfo.io</code> for your ISP and ASN, and <code>ipv6.icanhazip.com</code> for the IPv6 check, over HTTPS.</li>
+          <li>The latency and speed-test hosts listed in the <a href="https://github.com/jacboy/sysperf#network-throughput">README</a>.</li>
+          <li><code>cdn.geekbench.com</code> and <code>browser.geekbench.com</code>, only with <code>GEEKBENCH=7</code>.</li>
+          <li>Nobody else. sysperf collects no data, and this site uses no cookies, analytics or third-party resources.</li>
+        </ul>
+      </article>
+    </div>
+  </section>
+</main>
+
+<footer class="site-footer">
+  <div class="wrap footer-inner">
+    <span>sysperf __VERSION__</span>
+    <a href="https://github.com/jacboy/sysperf">Source on GitHub</a>
+    <a href="https://github.com/jacboy/sysperf/issues">Report a problem</a>
+  </div>
+</footer>
+<script src="/copy.js"></script>
+</body>
+</html>
