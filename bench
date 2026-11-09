@@ -36,27 +36,28 @@ This version of Debian is too old and unsupported"
 	exit
 fi
 
-# Check if user is root
-if [[ "$EUID" -ne 0 ]]; then
-	echo "Sorry, you need to run this as root"
-	exit
-fi
-
-# Check if the required packages are installed
+# Check if the required packages are installed. Root is only needed to install them.
 if  [ ! -e '/usr/bin/wget' ] || [ ! -e '/usr/bin/fio' ] || [ ! -e '/usr/bin/curl' ] || [ ! -e '/usr/bin/jq' ]; then
-    echo "Couldn't find [wget, fio, curl, jq]"    	
-    read -n 1 -r -s -p  "Please press enter to install the required packages automatically" 
-   
-   apt update && apt install -y curl jq fio wget
+    echo "Couldn't find [wget, fio, curl, jq]"
+    if [[ "$EUID" -ne 0 ]]; then
+        echo "Please install them first: apt install ca-certificates curl jq fio wget"
+        exit 1
+    fi
+    # Read from the terminal: when run as "wget -qO- ... | bash", stdin is the script itself
+    read -n 1 -r -s -p "Please press enter to install the required packages automatically" < /dev/tty
+    echo
+    apt update && apt install -y ca-certificates curl jq fio wget || exit 1
 fi
 
-
-
+# Private working directory for the I/O test file and Geekbench. It is created in the
+# current directory so the I/O test still measures that disk, but with an unpredictable
+# name and mode 0700, so other local users can't pre-plant files or symlinks in it.
+WORKDIR=$( mktemp -d "${PWD}/.sysperf.XXXXXXXX" ) || { echo "Error: cannot create a working directory in ${PWD}"; exit 1; }
+trap 'rm -rf -- "$WORKDIR"' EXIT
+trap 'exit 130' INT TERM
 
 # Test IPv6 connectivity
-ipv6=$( wget -qO- -t1 -T2 ipv6.icanhazip.com )
-# Get public IP for ASN/ ISP check
-as_check=$( wget -qO- -t1 -T2 icanhazip.com )
+ipv6=$( wget -qO- -t1 -T2 https://ipv6.icanhazip.com )
 
 
 # Colors
@@ -73,9 +74,18 @@ PLAIN='\033[0m'
 #
 #
 
+# Strip control characters (e.g. terminal escape sequences) from untrusted text
+sanitize() {
+    LC_ALL=C tr -cd '[:print:]'
+}
+
 get_netinfo() {
-    isp=$(curl -s http://ip-api.com/json/$as_check | jq '.isp' | sed 's/"//g')
-    as=$(curl -s http://ip-api.com/json/$as_check | jq '.as' | sed 's/"//g')
+    # ipinfo.io looks up the caller's own address over HTTPS, so no IP from another
+    # response is ever put into a URL. "org" looks like "AS3320 Deutsche Telekom AG".
+    local org
+    org=$( curl -fsS --proto '=https' --max-time 10 https://ipinfo.io/json 2>/dev/null | jq -r '.org // empty' 2>/dev/null | sanitize )
+    as="$org"
+    isp="${org#AS* }"
 }
 
 get_opsy() {
@@ -84,15 +94,16 @@ get_opsy() {
     [ -f /etc/lsb-release ] && awk -F'[="]+' '/DESCRIPTION/{print $2}' /etc/lsb-release && return
 }
 get_sys_type() {
-    if [ $(systemd-detect-virt) == none ]; then 
-            sys_type="Baremetal"
-        elif [ $(systemd-detect-virt) == kvm ]; then
-            sys_type="KVM"
-        elif [ $(systemd-detect-virt) == lxc ]; then
-            sys_type="LXC"
-        elif [ $(systemd-detect-virt) == openvz ]; then
-            sys_type="OpenVZ"
-    fi
+    local virt
+    virt=$( systemd-detect-virt 2>/dev/null )
+    case "$virt" in
+        none)   sys_type="Baremetal" ;;
+        kvm)    sys_type="KVM" ;;
+        lxc)    sys_type="LXC" ;;
+        openvz) sys_type="OpenVZ" ;;
+        "")     sys_type="Unknown" ;;
+        *)      sys_type="$virt" ;;
+    esac
 }
 
 next() {
@@ -142,8 +153,9 @@ ping_result() {
 
 io_test() {
    # Run rand read/write mixed 512kb fio test
-   fio --name=rand_rw_512k --ioengine=libaio --rw=randrw --rwmixread=50 --bs=512k --iodepth=64 --numjobs=2 --size=2G --runtime=30 --gtod_reduce=1 --direct=1 --filename=$RANDOM"_IOTEST" | grep "WRITE:" | awk '{print $3}' | sed 's/,//g' | sed 's/(//g' | sed 's/)//g'
-   rm *_IOTEST
+   local testfile="$WORKDIR/fio_iotest"
+   fio --name=rand_rw_512k --ioengine=libaio --rw=randrw --rwmixread=50 --bs=512k --iodepth=64 --numjobs=2 --size=2G --runtime=30 --gtod_reduce=1 --direct=1 --filename="$testfile" | grep "WRITE:" | awk '{print $3}' | sed 's/,//g' | sed 's/(//g' | sed 's/)//g'
+   rm -f -- "$testfile"
    sleep 10
 }
 
@@ -151,28 +163,48 @@ io_test() {
 geekbench5() {
   # Check if system has at least 2GB RAM in order to run Geekbench 5
   ram=$(free -m | awk '/Mem/ {print $2}')
-  if [ $ram -lt 2048 ]
+  if [ "$ram" -lt 2048 ]
   then
-      echo "RAM:" $ram"MB"
+      echo "RAM:" "$ram""MB"
       echo "Error: Not enough memory available. Geekbench 5 requires as least 2GB"
-      exit 1
+      return 1
   fi
 	echo -e "Running Geekbench5 CPU Benchmark. This will take a few minutes..."
-	GEEKBENCH_PATH=$HOME/geekbench
-	mkdir -p $GEEKBENCH_PATH
-	curl -s http://cdn.geekbench.com/Geekbench-5.1.0-Linux.tar.gz  | tar xz --strip-components=1 -C $GEEKBENCH_PATH
-	GEEKBENCH_TEST=$($GEEKBENCH_PATH/geekbench5 | grep "https://browser")
-	GEEKBENCH_URL=$(echo -e $GEEKBENCH_TEST | head -1)
-	GEEKBENCH_URL_CLAIM=$(echo $GEEKBENCH_URL | awk '{ print $2 }')
-	GEEKBENCH_URL=$(echo $GEEKBENCH_URL | awk '{ print $1 }')
+	echo -e "Note: Geekbench uploads the result and basic system information to the public Geekbench Browser."
+	local GEEKBENCH_DL_URL="https://cdn.geekbench.com/Geekbench-5.1.0-Linux.tar.gz"
+	local GEEKBENCH_SHA256="e3b6516df532f94038340ab3ae6f31331c357636f32d46b1ebf9e105cbe418c3"
+	local GEEKBENCH_TARBALL="$WORKDIR/geekbench.tar.gz"
+	local GEEKBENCH_PATH="$WORKDIR/geekbench"
+	if ! curl -fsSL --proto '=https' --max-time 300 -o "$GEEKBENCH_TARBALL" "$GEEKBENCH_DL_URL"; then
+		echo "Error: Geekbench download failed, skipping the CPU benchmark"
+		return 1
+	fi
+	if ! echo "$GEEKBENCH_SHA256  $GEEKBENCH_TARBALL" | sha256sum -c --quiet - >/dev/null 2>&1; then
+		echo "Error: Geekbench download does not match the expected SHA-256 checksum, not running it"
+		return 1
+	fi
+	mkdir -p "$GEEKBENCH_PATH"
+	if ! tar xzf "$GEEKBENCH_TARBALL" --strip-components=1 -C "$GEEKBENCH_PATH"; then
+		echo "Error: could not extract Geekbench, skipping the CPU benchmark"
+		return 1
+	fi
+	GEEKBENCH_TEST=$("$GEEKBENCH_PATH/geekbench5" | grep "https://browser")
+	GEEKBENCH_URL=$(echo "$GEEKBENCH_TEST" | head -1 | awk '{ print $1 }')
+	if [[ ! "$GEEKBENCH_URL" =~ ^https://browser\.geekbench\.com/[A-Za-z0-9/]+$ ]]; then
+		echo "Error: could not get the Geekbench result URL"
+		return 1
+	fi
 	sleep 10
-	GEEKBENCH_SCORES_SINGLE=$(curl -s $GEEKBENCH_URL | grep "class='score'" | head -2 | tr -d \'\" | sed 's/class=score//g' | sed "s/ //g" | sed -n 's:.*<div>\(.*\)</div>.*:\1:p' | head -n 1)
-	GEEKBENCH_SCORES_MULTI=$(curl -s $GEEKBENCH_URL | grep "class='score'" | head -2 | tr -d \'\" | sed 's/class=score//g' | sed "s/ //g" | sed -n 's:.*<div>\(.*\)</div>.*:\1:p' | sed -n 2p)
+	GEEKBENCH_PAGE=$(curl -fsS --proto '=https' --max-time 30 "$GEEKBENCH_URL")
+	GEEKBENCH_SCORES=$(echo "$GEEKBENCH_PAGE" | grep "class='score'" | head -2 | tr -d \'\" | sed 's/class=score//g' | sed "s/ //g" | sed -n 's:.*<div>\(.*\)</div>.*:\1:p' | tr -cd '0-9\n')
+	GEEKBENCH_SCORES_SINGLE=$(echo "$GEEKBENCH_SCORES" | sed -n 1p)
+	GEEKBENCH_SCORES_MULTI=$(echo "$GEEKBENCH_SCORES" | sed -n 2p)
 	echo -ne "\e[1A"; echo -ne "\033[0K\r"
 	echo -e "Geekbench v5"
-	echo -e "Single Core          :" ${BLUE} $GEEKBENCH_SCORES_SINGLE ${PLAIN}
-	echo -e "Multi Core           :" ${YELLOW} $GEEKBENCH_SCORES_MULTI ${PLAIN}
-	rm -rf geekbench/
+	echo -e "Single Core          :" "${BLUE}" "$GEEKBENCH_SCORES_SINGLE" "${PLAIN}"
+	echo -e "Multi Core           :" "${YELLOW}" "$GEEKBENCH_SCORES_MULTI" "${PLAIN}"
+	echo -e "Full result          :" "$GEEKBENCH_URL"
+	rm -rf -- "$GEEKBENCH_PATH" "$GEEKBENCH_TARBALL"
 }
 
 calc_disk() {
@@ -182,10 +214,10 @@ calc_disk() {
     do
         [ "${size}" == "0" ] && size_t=0 || size_t=`echo ${size:0:${#size}-1}`
         [ "`echo ${size:(-1)}`" == "K" ] && size=0
-        [ "`echo ${size:(-1)}`" == "M" ] && size=$( awk 'BEGIN{printf "%.1f", '$size_t' / 1024}' )
-        [ "`echo ${size:(-1)}`" == "T" ] && size=$( awk 'BEGIN{printf "%.1f", '$size_t' * 1024}' )
+        [ "`echo ${size:(-1)}`" == "M" ] && size=$( awk -v s="$size_t" 'BEGIN{printf "%.1f", s / 1024}' )
+        [ "`echo ${size:(-1)}`" == "T" ] && size=$( awk -v s="$size_t" 'BEGIN{printf "%.1f", s * 1024}' )
         [ "`echo ${size:(-1)}`" == "G" ] && size=${size_t}
-        total_size=$( awk 'BEGIN{printf "%.1f", '$total_size' + '$size'}' )
+        total_size=$( awk -v t="$total_size" -v s="$size" 'BEGIN{printf "%.1f", t + s}' )
     done
     echo ${total_size}
 }
@@ -226,8 +258,8 @@ echo -e "Load average         : ${BLUE}$load${PLAIN}"
 echo -e "OS                   : ${BLUE}$opsy${PLAIN}"
 echo -e "Arch                 : ${BLUE}$arch ($lbit Bit)${PLAIN}"
 echo -e "Kernel               : ${BLUE}$kern${PLAIN}"
-echo -e "ISP                  : ${BLUE}$isp${PLAIN}"
-echo -e "ASN                  : ${BLUE}$as${PLAIN}"
+printf "ISP                  : ${BLUE}%s${PLAIN}\n" "$isp"
+printf "ASN                  : ${BLUE}%s${PLAIN}\n" "$as"
 if [[ "$ipv6" != "" ]]; then
 echo -e "IPv6 Support         : ${BLUE}Yes${PLAIN}"
 else
@@ -243,8 +275,7 @@ echo -e "I/O bandwidth (3rd run)  : ${YELLOW}$io3${PLAIN}"
 rawio1=$( echo $io1 | sed 's/MB//g' | sed 's/s//g' | sed 's/.$//')
 rawio2=$( echo $io2 | sed 's/MB//g' | sed 's/s//g' | sed 's/.$//')
 rawio3=$( echo $io3 | sed 's/MB//g' | sed 's/s//g' | sed 's/.$//')
-ioall=$( awk 'BEGIN{print '$rawio1' + '$rawio2' + '$rawio3'}' )
-ioavg=$( awk 'BEGIN{printf "%.1f", '$ioall' / 3}' )
+ioavg=$( awk -v a="$rawio1" -v b="$rawio2" -v c="$rawio3" 'BEGIN{printf "%.1f", (a + b + c) / 3}' )
 echo -e "Average I/O bandwidth    : ${YELLOW}$ioavg MB/s${PLAIN}"
 next
 printf "%-32s%-24s%-14s\n" "Location" "Latency"
