@@ -1,0 +1,98 @@
+# Deploys the website (site/) and the script (/bench) to Cloudflare Pages
+# (project "sysperf", served at https://getsysperf.com and https://sysperf.pages.dev).
+#
+# Required repository secret (Settings -> Secrets and variables -> Actions):
+#   CLOUDFLARE_API_TOKEN  Cloudflare API token with only "Account · Cloudflare Pages · Edit"
+#                         for the account below. No DNS or zone permissions needed.
+
+name: Deploy site
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - bench
+      - site/**
+      - .github/workflows/deploy.yml
+  workflow_dispatch:
+
+# Read-only access to the repository is all this workflow needs.
+permissions:
+  contents: read
+
+# Never run two deployments at the same time; a newer one waits for the running one.
+concurrency:
+  group: deploy-site
+  cancel-in-progress: false
+
+env:
+  CLOUDFLARE_ACCOUNT_ID: 31a0fffa054aea0a8d8c8e2393d78025
+  PAGES_PROJECT: sysperf
+  PAGES_URL: https://sysperf.pages.dev
+  SITE_URL: https://getsysperf.com
+  WRANGLER_VERSION: 4.159.0
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment:
+      name: production
+      url: https://getsysperf.com
+    steps:
+      # Actions are pinned to full commit hashes, not tags, so a moved tag can't change what runs here.
+      - name: Check out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+
+      - name: Build site
+        run: bash site/build.sh
+
+      - name: Deploy to Cloudflare Pages
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          WRANGLER_SEND_METRICS: "false"
+        run: |
+          if [ -z "$CLOUDFLARE_API_TOKEN" ]; then
+            echo "::error::Missing secret CLOUDFLARE_API_TOKEN"
+            exit 1
+          fi
+          npx --yes "wrangler@${WRANGLER_VERSION}" pages deploy dist \
+            --project-name="$PAGES_PROJECT" \
+            --branch=master \
+            --commit-hash="$GITHUB_SHA" \
+            --commit-message="Deploy ${GITHUB_SHA::7} (run ${GITHUB_RUN_ID})"
+
+      - name: Verify deployment
+        run: |
+          # The live /bench must be byte-identical to the one just built, and the page must
+          # show the same version. sysperf.pages.dev must match; getsysperf.com is checked
+          # too, but only warns while the custom domain is still being set up.
+          expected=$(cut -d' ' -f1 dist/bench.sha256)
+          version=$(sed -n 's/^SYSPERF_VERSION="\([^"]*\)"$/\1/p' bench)
+          check() {
+            local base=$1 live attempt
+            for attempt in 1 2 3 4 5 6; do
+              live=$(curl -fsS --proto '=https' "${base}/bench" | sha256sum | cut -d' ' -f1) || live=""
+              if [ "$live" = "$expected" ] \
+                && curl -fsS --proto '=https' "${base}/" | grep -q "Version ${version}"; then
+                return 0
+              fi
+              echo "${base}: attempt ${attempt}, /bench checksum '${live}', expected ${expected}; retrying"
+              sleep 10
+            done
+            return 1
+          }
+          check "$PAGES_URL" || { echo "::error::${PAGES_URL} does not serve the new build"; exit 1; }
+          curl -fsS --proto '=https' "${PAGES_URL}/bench" | bash -n
+          if check "$SITE_URL"; then
+            echo "Deployed sysperf ${version} to ${SITE_URL} and ${PAGES_URL} (bench sha256 ${expected})"
+          else
+            echo "::warning::${SITE_URL} does not serve the new build yet (custom domain not active?)"
+          fi
