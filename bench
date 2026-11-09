@@ -234,57 +234,119 @@ io_test() {
 }
 
 
-geekbench5() {
-  # Check if system has at least 2GB RAM in order to run Geekbench 5
-  ram=$(free -m | awk '/Mem/ {print $2}')
-  if [ "$ram" -lt 2048 ]
-  then
-      echo "RAM:" "$ram""MB"
-      echo "Error: Not enough memory available. Geekbench 5 requires as least 2GB"
-      return 1
-  fi
-	echo -e "Note: Geekbench uploads the result and basic system information to the public Geekbench Browser."
-	local GEEKBENCH_DL_URL="https://cdn.geekbench.com/Geekbench-5.1.0-Linux.tar.gz"
-	local GEEKBENCH_SHA256="e3b6516df532f94038340ab3ae6f31331c357636f32d46b1ebf9e105cbe418c3"
-	local GEEKBENCH_TARBALL="$WORKDIR/geekbench.tar.gz"
-	local GEEKBENCH_PATH="$WORKDIR/geekbench"
-	spinner_start "Downloading Geekbench 5"
-	curl -fsSL --proto '=https' --max-time 300 -o "$GEEKBENCH_TARBALL" "$GEEKBENCH_DL_URL"
+# Geekbench CPU benchmark.
+#   SKIP_GEEKBENCH=1    skip it entirely
+#   FORCE_GEEKBENCH6=1  use Geekbench 6 even when there is room for Geekbench 7
+# Geekbench 7 needs ~1.5 GB free disk while running; with less, Geekbench 6 (~0.8 GB) is used.
+GB7_MIN_FREE_MB=1536
+GB6_MIN_FREE_MB=800
+
+geekbench() {
+	if [ -n "${SKIP_GEEKBENCH:-}" ] && [ "$SKIP_GEEKBENCH" != "0" ]; then
+		echo "Geekbench            : skipped (SKIP_GEEKBENCH is set)"
+		return 0
+	fi
+
+	# Check if system has at least 2GB RAM in order to run Geekbench
+	local ram
+	ram=$(free -m | awk '/Mem/ {print $2}')
+	if [ "$ram" -lt 2048 ]; then
+		echo "Geekbench            : skipped (${ram} MB RAM, at least 2 GB is required)"
+		return 0
+	fi
+
+	local suffix
+	case "$(uname -m)" in
+		x86_64)        suffix="Linux" ;;
+		aarch64|arm64) suffix="LinuxARMPreview" ;;
+		*)
+			echo "Geekbench            : skipped (no Geekbench build for $(uname -m))"
+			return 0 ;;
+	esac
+
+	local force6=0
+	if [ -n "${FORCE_GEEKBENCH6:-}" ] && [ "$FORCE_GEEKBENCH6" != "0" ]; then
+		force6=1
+	fi
+
+	local free_mb version reason=""
+	free_mb=$(df -Pm "$WORKDIR" | awk 'NR==2 {print $4}')
+	if [ "$force6" = 0 ] && [ "$free_mb" -ge "$GB7_MIN_FREE_MB" ]; then
+		version="7.1.0"
+	elif [ "$free_mb" -ge "$GB6_MIN_FREE_MB" ]; then
+		version="6.6.0"
+		if [ "$force6" = 1 ]; then
+			reason="FORCE_GEEKBENCH6 is set"
+		else
+			reason="only ${free_mb} MB free disk, Geekbench 7 needs 1.5 GB"
+		fi
+	else
+		echo "Geekbench            : skipped (only ${free_mb} MB free disk, at least ${GB6_MIN_FREE_MB} MB is required)"
+		return 0
+	fi
+
+	# SHA-256 of the official tarballs, downloaded over HTTPS from cdn.geekbench.com on 2026-11-09
+	local sha256
+	case "${version}-${suffix}" in
+		7.1.0-Linux)           sha256="411b72a9c851b69e6f91d390649d419e2e625f475e3983880169651ca27a8672" ;;
+		7.1.0-LinuxARMPreview) sha256="bb6abc61a68a9b33fecf1f3c0b800050dd76e93666a13eaabfa52cbd26ad3319" ;;
+		6.6.0-Linux)           sha256="c94510f3658cd31d55bbc5feb21aef19f5a34ff4036f789643c0dc212104b0e7" ;;
+		6.6.0-LinuxARMPreview) sha256="86ffc902cc4d1279d97122de97563020ba65d7909593646a230d77b8e4dccf68" ;;
+	esac
+
+	local major=${version%%.*}
+	local url="https://cdn.geekbench.com/Geekbench-${version}-${suffix}.tar.gz"
+	local tarball="$WORKDIR/geekbench.tar.gz"
+	local gbdir="$WORKDIR/geekbench"
+	local gbout="$WORKDIR/geekbench.out"
+
+	[ -n "$reason" ] && echo "Using Geekbench ${major}: ${reason}"
+	echo "Note: Geekbench uploads the result and basic system information to the public Geekbench Browser."
+
+	spinner_start "Downloading Geekbench ${version}"
+	curl -fsSL --proto '=https' --max-time 900 -o "$tarball" "$url"
 	local rc=$?
 	spinner_stop
 	if [ "$rc" -ne 0 ]; then
 		echo "Error: Geekbench download failed, skipping the CPU benchmark"
 		return 1
 	fi
-	if ! echo "$GEEKBENCH_SHA256  $GEEKBENCH_TARBALL" | sha256sum -c --quiet - >/dev/null 2>&1; then
+	if ! echo "$sha256  $tarball" | sha256sum -c --quiet - >/dev/null 2>&1; then
 		echo "Error: Geekbench download does not match the expected SHA-256 checksum, not running it"
+		rm -f -- "$tarball"
 		return 1
 	fi
-	mkdir -p "$GEEKBENCH_PATH"
-	if ! tar xzf "$GEEKBENCH_TARBALL" --strip-components=1 -C "$GEEKBENCH_PATH"; then
+	mkdir -p "$gbdir"
+	spinner_start "Extracting Geekbench ${version}"
+	tar xzf "$tarball" --strip-components=1 -C "$gbdir"
+	rc=$?
+	spinner_stop
+	rm -f -- "$tarball"
+	if [ "$rc" -ne 0 ] || [ ! -x "$gbdir/geekbench${major}" ]; then
 		echo "Error: could not extract Geekbench, skipping the CPU benchmark"
+		rm -rf -- "$gbdir"
 		return 1
 	fi
-	spinner_start "Running Geekbench 5 CPU benchmark, this takes a few minutes"
-	GEEKBENCH_TEST=$("$GEEKBENCH_PATH/geekbench5" | grep "https://browser")
+
+	spinner_start "Running Geekbench ${version} CPU benchmark, this takes a few minutes"
+	"$gbdir/geekbench${major}" > "$gbout" 2>/dev/null
 	spinner_stop
-	GEEKBENCH_URL=$(echo "$GEEKBENCH_TEST" | head -1 | awk '{ print $1 }')
-	if [[ ! "$GEEKBENCH_URL" =~ ^https://browser\.geekbench\.com/[A-Za-z0-9/]+$ ]]; then
-		echo "Error: could not get the Geekbench result URL"
+
+	local result_url single multi
+	result_url=$(grep -oE 'https://browser\.geekbench\.com/v[0-9]+/cpu/[0-9]+' "$gbout" | head -1)
+	single=$(awk '/Single-Core Score/ {print $NF; exit}' "$gbout" | tr -cd '0-9')
+	multi=$(awk '/Multi-Core Score/ {print $NF; exit}' "$gbout" | tr -cd '0-9')
+	rm -rf -- "$gbdir" "$gbout"
+
+	if [ -z "$single" ] && [ -z "$result_url" ]; then
+		echo "Error: Geekbench did not report a result"
 		return 1
 	fi
-	spinner_start "Fetching Geekbench scores"
-	sleep 10
-	GEEKBENCH_PAGE=$(curl -fsS --proto '=https' --max-time 30 "$GEEKBENCH_URL")
-	spinner_stop
-	GEEKBENCH_SCORES=$(echo "$GEEKBENCH_PAGE" | grep "class='score'" | head -2 | tr -d \'\" | sed 's/class=score//g' | sed "s/ //g" | sed -n 's:.*<div>\(.*\)</div>.*:\1:p' | tr -cd '0-9\n')
-	GEEKBENCH_SCORES_SINGLE=$(echo "$GEEKBENCH_SCORES" | sed -n 1p)
-	GEEKBENCH_SCORES_MULTI=$(echo "$GEEKBENCH_SCORES" | sed -n 2p)
-	echo -e "Geekbench v5"
-	echo -e "Single Core          :" "${BLUE}" "$GEEKBENCH_SCORES_SINGLE" "${PLAIN}"
-	echo -e "Multi Core           :" "${YELLOW}" "$GEEKBENCH_SCORES_MULTI" "${PLAIN}"
-	echo -e "Full result          :" "$GEEKBENCH_URL"
-	rm -rf -- "$GEEKBENCH_PATH" "$GEEKBENCH_TARBALL"
+	echo -e "Geekbench v${version}"
+	echo -e "Single Core          : ${BLUE}${single:-n/a}${PLAIN}"
+	echo -e "Multi Core           : ${YELLOW}${multi:-n/a}${PLAIN}"
+	[ -n "$result_url" ] && echo -e "Full result          : ${result_url}"
+	return 0
 }
 
 calc_disk() {
@@ -372,4 +434,5 @@ next
 printf "%-32s%-24s%-14s\n" "Location" "Speed"
     
 speed_result && next
-geekbench5 && next
+geekbench
+next
