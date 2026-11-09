@@ -37,16 +37,16 @@ This version of Debian is too old and unsupported"
 fi
 
 # Check if the required packages are installed. Root is only needed to install them.
-if ! command -v wget >/dev/null || ! command -v fio >/dev/null || ! command -v curl >/dev/null || ! command -v jq >/dev/null || ! command -v ping >/dev/null; then
-    echo "Couldn't find [wget, fio, curl, jq, ping]"
+if ! command -v wget >/dev/null || ! command -v fio >/dev/null || ! command -v curl >/dev/null || ! command -v jq >/dev/null || ! command -v ping >/dev/null || ! command -v sysbench >/dev/null; then
+    echo "Couldn't find [wget, fio, curl, jq, ping, sysbench]"
     if [[ "$EUID" -ne 0 ]]; then
-        echo "Please install them first: apt install ca-certificates curl jq fio wget iputils-ping"
+        echo "Please install them first: apt install ca-certificates curl jq fio wget iputils-ping sysbench"
         exit 1
     fi
     # Read from the terminal: when run as "wget -qO- ... | bash", stdin is the script itself
     read -n 1 -r -s -p "Please press enter to install the required packages automatically" < /dev/tty
     echo
-    apt update && apt install -y ca-certificates curl jq fio wget iputils-ping || exit 1
+    apt update && apt install -y ca-certificates curl jq fio wget iputils-ping sysbench || exit 1
 fi
 
 # Private working directory for the I/O test file and Geekbench. It is created in the
@@ -234,18 +234,38 @@ io_test() {
 }
 
 
-# Geekbench CPU benchmark.
-#   SKIP_GEEKBENCH=1    skip it entirely
-#   FORCE_GEEKBENCH6=1  use Geekbench 6 even when there is room for Geekbench 7
-# Geekbench 7 needs ~1.5 GB free disk while running; with less, Geekbench 6 (~0.8 GB) is used.
+# CPU benchmark with sysbench (from the distribution's own packages). Always runs.
+cpu_bench() {
+	local threads single multi
+	threads=$(nproc)
+	spinner_start "Running CPU benchmark (single core)"
+	single=$(sysbench cpu --cpu-max-prime=20000 --threads=1 --time=10 run 2>/dev/null | awk -F: '/events per second/ {gsub(/ /, "", $2); print $2}')
+	spinner_stop
+	spinner_start "Running CPU benchmark (${threads} threads)"
+	multi=$(sysbench cpu --cpu-max-prime=20000 --threads="$threads" --time=10 run 2>/dev/null | awk -F: '/events per second/ {gsub(/ /, "", $2); print $2}')
+	spinner_stop
+	echo "CPU benchmark (sysbench, events per second, higher is better)"
+	printf "Single Core          : ${BLUE}%s${PLAIN}\n" "${single:-failed}"
+	printf "Multi Core           : ${YELLOW}%s${PLAIN} (%s threads)\n" "${multi:-failed}" "$threads"
+}
+
+# Optional Geekbench CPU benchmark, only downloaded and run when requested:
+#   GEEKBENCH=7 (or 1)  Geekbench 7; falls back to Geekbench 6 with less than 1.5 GB free disk
+#   GEEKBENCH=6         Geekbench 6
+# Geekbench 7 needs ~1.5 GB free disk while running, Geekbench 6 ~0.8 GB.
 GB7_MIN_FREE_MB=1536
 GB6_MIN_FREE_MB=800
 
 geekbench() {
-	if [ -n "${SKIP_GEEKBENCH:-}" ] && [ "$SKIP_GEEKBENCH" != "0" ]; then
-		echo "Geekbench            : skipped (SKIP_GEEKBENCH is set)"
-		return 0
-	fi
+	local force6=0
+	case "${GEEKBENCH:-}" in
+		""|0) return 0 ;;
+		1|7)  ;;
+		6)    force6=1 ;;
+		*)
+			printf "Geekbench            : skipped (unknown GEEKBENCH value '%s', use 6 or 7)\n" "$GEEKBENCH"
+			return 0 ;;
+	esac
 
 	# Check if system has at least 2GB RAM in order to run Geekbench
 	local ram
@@ -264,11 +284,6 @@ geekbench() {
 			return 0 ;;
 	esac
 
-	local force6=0
-	if [ -n "${FORCE_GEEKBENCH6:-}" ] && [ "$FORCE_GEEKBENCH6" != "0" ]; then
-		force6=1
-	fi
-
 	local free_mb version reason=""
 	free_mb=$(df -Pm "$WORKDIR" | awk 'NR==2 {print $4}')
 	if [ "$force6" = 0 ] && [ "$free_mb" -ge "$GB7_MIN_FREE_MB" ]; then
@@ -276,7 +291,7 @@ geekbench() {
 	elif [ "$free_mb" -ge "$GB6_MIN_FREE_MB" ]; then
 		version="6.6.0"
 		if [ "$force6" = 1 ]; then
-			reason="FORCE_GEEKBENCH6 is set"
+			reason="GEEKBENCH=6 is set"
 		else
 			reason="only ${free_mb} MB free disk, Geekbench 7 needs 1.5 GB"
 		fi
@@ -302,10 +317,11 @@ geekbench() {
 
 	[ -n "$reason" ] && echo "Using Geekbench ${major}: ${reason}"
 	# TODO: disable the upload to the public Geekbench Browser (to be fixed with the next
-	# changes to the script). The free Geekbench 6/7 CLI has no option for this: `geekbench7
-	# --help` only lists --unlock EMAIL KEY, --cpu and --sysinfo. Offline runs most likely
-	# need a Geekbench Pro license (--unlock); verify before implementing. The scores are
-	# already read from the local output, so nothing else depends on the upload.
+	# changes to the script). Geekbench only runs when GEEKBENCH is set, but then the free
+	# version always uploads: `geekbench7 --help` only lists --unlock EMAIL KEY, --cpu and
+	# --sysinfo, and Geekbench 6 prints "Upgrade to Geekbench 6 Pro to enable offline use".
+	# So it needs a user-supplied Pro license (--unlock). The scores are already read from
+	# the local output, so nothing else depends on the upload.
 	echo "Note: Geekbench uploads the result and basic system information to the public Geekbench Browser."
 
 	spinner_start "Downloading Geekbench ${version}"
@@ -439,5 +455,9 @@ next
 printf "%-32s%-24s%-14s\n" "Location" "Speed"
     
 speed_result && next
-geekbench
+cpu_bench
 next
+if [ -n "${GEEKBENCH:-}" ] && [ "$GEEKBENCH" != "0" ]; then
+    geekbench
+    next
+fi
