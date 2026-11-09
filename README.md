@@ -28,7 +28,13 @@ less bench
 bash bench
 ```
 
-The SHA-256 of the current version is published at [getsysperf.com/bench.sha256](https://getsysperf.com/bench.sha256).
+To check that getsysperf.com serves exactly the script in this repository, compare the two. No output other than "identical" means they match:
+
+```bash
+diff <(curl -fsSL https://getsysperf.com/bench) <(curl -fsSL https://raw.githubusercontent.com/jacboy/sysperf/master/bench) && echo "identical"
+```
+
+The site deploys every push to `master` within a minute or two, so the two can briefly differ right after a change.
 
 ### Keep a log
 

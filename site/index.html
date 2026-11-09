@@ -126,15 +126,26 @@ Multi Core           : <span class="t-yellow">1229.58</span> (2 threads)</code><
 
   <section id="trust" class="wrap section">
     <h2>Before you run it</h2>
-    <p>Piping a script into bash means trusting it. The script is short, readable and open source. You can download and read it first:</p>
+    <p>Piping a script into bash means trusting two things: the script itself, and whoever serves it to you. You can check both.</p>
+
+    <h3 class="step">1. Read the script</h3>
+    <p>This site serves <code>bench</code> unchanged from commit <a href="https://github.com/jacboy/sysperf/tree/__COMMIT__"><code>__COMMIT_SHORT__</code></a> of <a href="https://github.com/jacboy/sysperf">github.com/jacboy/sysperf</a>. It's a single, plain bash file. Read <a href="https://github.com/jacboy/sysperf/blob/__COMMIT__/bench">exactly that version on GitHub</a>, or see <a href="https://github.com/jacboy/sysperf/commits/master/bench">every change ever made to it</a>. Or download it, read it, then run it:</p>
     <div class="cmd cmd-small" data-copy-group>
       <div class="cmd-line">
         <code><span class="cmd-prompt" aria-hidden="true">$</span><span data-copy-text>curl -fsSLO https://getsysperf.com/bench &amp;&amp; less bench &amp;&amp; bash bench</span></code>
         <button type="button" class="copy" data-copy>Copy</button>
       </div>
     </div>
-    <p>SHA-256 of version __VERSION__ (also at <a href="/bench.sha256">/bench.sha256</a>):</p>
-    <p class="hash"><code>__SHA256__</code></p>
+
+    <h3 class="step">2. Check that this site serves exactly that version</h3>
+    <p>Compare the script from this site with the same commit on GitHub. They are two independent sources: to hand you a different script, someone would have to compromise both.</p>
+    <div class="cmd cmd-small" data-copy-group>
+      <div class="cmd-line">
+        <code><span class="cmd-prompt" aria-hidden="true">$</span><span data-copy-text>diff &lt;(curl -fsSL https://getsysperf.com/bench) &lt;(curl -fsSL https://raw.githubusercontent.com/jacboy/sysperf/__COMMIT__/bench) &amp;&amp; echo "identical"</span></code>
+        <button type="button" class="copy" data-copy>Copy</button>
+      </div>
+    </div>
+    <p class="muted-note">This shows that the site serves what is public on GitHub, nothing more. Whether you trust the code itself is your call; that's what step 1 is for.</p>
 
     <div class="cards two">
       <article class="card">
@@ -160,7 +171,7 @@ Multi Core           : <span class="t-yellow">1229.58</span> (2 threads)</code><
 
 <footer class="site-footer">
   <div class="wrap footer-inner">
-    <span>sysperf __VERSION__</span>
+    <span>sysperf __VERSION__ · commit <a href="https://github.com/jacboy/sysperf/tree/__COMMIT__">__COMMIT_SHORT__</a></span>
     <a href="https://github.com/jacboy/sysperf">Source on GitHub</a>
     <a href="https://github.com/jacboy/sysperf/issues">Report a problem</a>
   </div>

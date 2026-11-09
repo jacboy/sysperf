@@ -22,6 +22,18 @@ if [ -z "$version" ]; then
 fi
 bash -n bench
 
+# The page names the commit the site is built from and tells visitors to compare /bench
+# with that commit on GitHub, so the served bench must be exactly the committed one.
+commit="${GITHUB_SHA:-$(git rev-parse HEAD 2>/dev/null || true)}"
+if [[ ! "$commit" =~ ^[0-9a-f]{40}$ ]]; then
+    echo "build.sh: cannot determine the git commit (got '${commit}')" >&2
+    exit 1
+fi
+if ! git diff --quiet "$commit" -- bench 2>/dev/null; then
+    echo "build.sh: bench differs from commit ${commit}; commit it first" >&2
+    exit 1
+fi
+
 rm -rf "$out"
 mkdir -p "$out"
 cp site/index.html site/style.css site/copy.js site/favicon.svg site/_headers "$out"/
@@ -29,10 +41,10 @@ cp bench "$out/bench"
 
 sha=$(sha256sum bench | cut -d' ' -f1)
 echo "$sha  bench" > "$out/bench.sha256"
-sed -i "s/__VERSION__/${version}/g; s/__SHA256__/${sha}/g; s#https://getsysperf\.com#${site_url}#g" "$out/index.html"
+sed -i "s/__VERSION__/${version}/g; s/__SHA256__/${sha}/g; s/__COMMIT_SHORT__/${commit:0:7}/g; s/__COMMIT__/${commit}/g; s#https://getsysperf\.com#${site_url}#g" "$out/index.html"
 
-if grep -q '__VERSION__\|__SHA256__' "$out/index.html"; then
+if grep -q '__VERSION__\|__SHA256__\|__COMMIT' "$out/index.html"; then
     echo "build.sh: placeholders left in index.html" >&2
     exit 1
 fi
-echo "Built sysperf ${version} site for ${site_url} into ${out}/ (bench sha256 ${sha})"
+echo "Built sysperf ${version} (commit ${commit:0:7}) site for ${site_url} into ${out}/ (bench sha256 ${sha})"
