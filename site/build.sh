@@ -9,7 +9,7 @@ cd "$(dirname "$0")/.."
 
 out="dist"
 # Where the site will be served; the commands on the page point there.
-# Default: production. The test deployment sets SITE_URL=https://sysperf.jf-l.de.
+# Default: production (https://getsysperf.com); set SITE_URL for a preview build.
 site_url="${SITE_URL:-https://getsysperf.com}"
 if [[ ! "$site_url" =~ ^https://[a-z0-9.-]+$ ]]; then
     echo "build.sh: SITE_URL must look like https://example.com (got '${site_url}')" >&2
