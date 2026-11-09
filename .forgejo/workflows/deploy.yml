@@ -1,7 +1,9 @@
+# Forgejo Actions workflow (git.gillekyl.de/jay/sysperf).
 # Deploys the website (site/) and the script (/bench) to Cloudflare Pages
 # (project "sysperf", served at https://getsysperf.com and https://sysperf.pages.dev).
+# It lives in .forgejo/workflows/, which GitHub ignores, so the GitHub mirror never deploys.
 #
-# Required repository secret (Settings -> Secrets and variables -> Actions):
+# Required repository secret (Forgejo: Settings -> Actions -> Secrets):
 #   CLOUDFLARE_API_TOKEN  Cloudflare API token with only "Account · Cloudflare Pages · Edit"
 #                         for the account below. No DNS or zone permissions needed.
 
@@ -13,7 +15,7 @@ on:
     paths:
       - bench
       - site/**
-      - .github/workflows/deploy.yml
+      - .forgejo/workflows/deploy.yml
   workflow_dispatch:
 
 # Read-only access to the repository is all this workflow needs.
@@ -36,11 +38,9 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    environment:
-      name: production
-      url: https://getsysperf.com
     steps:
       # Actions are pinned to full commit hashes, not tags, so a moved tag can't change what runs here.
+      # Forgejo resolves them from its default actions mirror, which mirrors github.com/actions.
       - name: Check out
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:

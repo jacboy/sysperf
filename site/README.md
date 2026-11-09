@@ -20,22 +20,23 @@ python3 -m http.server -d dist 8000
 ## Releasing a new version
 
 1. Change `bench` and raise `SYSPERF_VERSION` in it.
-2. Merge to `master`. The *Deploy site* GitHub Action (`.github/workflows/deploy.yml`) builds the site, uploads it to Cloudflare Pages and checks that the live `/bench` matches the build. The page then shows the new version and checksum.
+2. Merge to `master` on git.gillekyl.de. The *Deploy site* Forgejo Actions workflow (`.forgejo/workflows/deploy.yml`) builds the site, uploads it to Cloudflare Pages and checks that the live `/bench` matches the build. The page then shows the new version and commit.
 
 ## How it's hosted
 
 - **Cloudflare Pages project `sysperf`** (Direct Upload) in "Iandavid2000@googlemail.com's Account", which also holds the `getsysperf.com` zone. It's served at `https://sysperf.pages.dev` and, as custom domain, `https://getsysperf.com`.
-- **Deployments come only from GitHub Actions** (`.github/workflows/deploy.yml`), on every push to `master` that changes `bench`, `site/` or the workflow, or by hand under *Actions → Deploy site → Run workflow*.
-- **GitHub secret `CLOUDFLARE_API_TOKEN`:** an account API token with only *Account · Cloudflare Pages · Edit* for that account. No DNS or zone permissions.
+- **Source:** [git.gillekyl.de/jay/sysperf](https://git.gillekyl.de/jay/sysperf) (Forgejo) is the main repository. It push-mirrors to [github.com/jacboy/sysperf](https://github.com/jacboy/sysperf); nothing is merged on GitHub directly.
+- **Deployments come only from Forgejo Actions** (`.forgejo/workflows/deploy.yml`), on every push to `master` that changes `bench`, `site/` or the workflow, or by hand under *Actions → Deploy site → Run workflow*. It needs a runner available to `jay/sysperf` with the label `ubuntu-latest` (a user-level runner for `jay`). GitHub ignores `.forgejo/`, so the mirror never deploys.
+- **Forgejo secret `CLOUDFLARE_API_TOKEN`** (*Settings → Actions → Secrets* of `jay/sysperf`): an account API token with only *Account · Cloudflare Pages · Edit* for that account. No DNS or zone permissions.
 - **DNS:** `getsysperf.com CNAME sysperf.pages.dev`, proxied. The Pages API doesn't create this record by itself; the dashboard does when you add the domain there.
 
 ## Securing the domain
 
-Everyone who runs the one-liner trusts whoever controls this domain, the Cloudflare account and the GitHub repository. Before announcing the URL:
+Everyone who runs the one-liner trusts whoever controls this domain, the Cloudflare account and the Forgejo repository (and its runner). Before announcing the URL:
 
-- **2FA** on the Cloudflare account, the registrar account (Registrar.eu / Openprovider) and the GitHub account.
+- **2FA** on the Cloudflare account, the registrar account (Registrar.eu / Openprovider), the Forgejo account and the GitHub account (the mirror).
 - **DNSSEC:** *DNS → Settings → Enable DNSSEC* in Cloudflare, then add the shown DS record at the registrar.
-- **Branch protection** for `master` on GitHub (require a pull request), so nothing reaches `/bench` unreviewed.
+- **Branch protection** for `master` on Forgejo (require a pull request), so nothing reaches `/bench` unreviewed.
 - **No mail on this domain:** if no e-mail is sent from it, add these records so nobody can send e-mail in its name:
 
   | Type | Name | Content |

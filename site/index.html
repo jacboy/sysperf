@@ -17,7 +17,7 @@
       <a href="#measures">What it measures</a>
       <a href="#options">Options</a>
       <a href="#trust">Before you run</a>
-      <a href="https://github.com/jacboy/sysperf">GitHub</a>
+      <a href="https://git.gillekyl.de/jay/sysperf">Source</a>
     </nav>
   </div>
 </header>
@@ -75,7 +75,7 @@
     <h2>Example output</h2>
     <p class="muted">Debian 13, 2 vCPU KVM in Frankfurt. Shortened.</p>
 <pre class="terminal" tabindex="0"><code><span class="t-dim">-----</span>
-<span class="t-red">getsysperf.com</span> v__VERSION__ -- <span class="t-yellow">https://github.com/jacboy/sysperf</span>
+<span class="t-red">getsysperf.com</span> v__VERSION__ -- <span class="t-yellow">https://git.gillekyl.de/jay/sysperf</span>
 <span class="t-dim">-----</span>
 System type          : <span class="t-cyan">KVM</span>
 CPU model            : <span class="t-cyan">AMD EPYC 7702 64-Core Processor</span>
@@ -129,7 +129,7 @@ Multi Core           : <span class="t-yellow">1229.58</span> (2 threads)</code><
     <p>Piping a script into bash means trusting two things: the script itself, and whoever serves it to you. You can check both.</p>
 
     <h3 class="step">1. Read the script</h3>
-    <p>This site serves <code>bench</code> unchanged from commit <a href="https://github.com/jacboy/sysperf/tree/__COMMIT__"><code>__COMMIT_SHORT__</code></a> of <a href="https://github.com/jacboy/sysperf">github.com/jacboy/sysperf</a>. It's a single, plain bash file. Read <a href="https://github.com/jacboy/sysperf/blob/__COMMIT__/bench">exactly that version on GitHub</a>, or see <a href="https://github.com/jacboy/sysperf/commits/master/bench">every change ever made to it</a>. Or download it, read it, then run it:</p>
+    <p>This site serves <code>bench</code> unchanged from commit <a href="https://git.gillekyl.de/jay/sysperf/src/commit/__COMMIT__"><code>__COMMIT_SHORT__</code></a> of <a href="https://git.gillekyl.de/jay/sysperf">git.gillekyl.de/jay/sysperf</a>. It's a single, plain bash file. Read <a href="https://git.gillekyl.de/jay/sysperf/src/commit/__COMMIT__/bench">exactly that version in the repository</a>, or see <a href="https://git.gillekyl.de/jay/sysperf/commits/branch/master/bench">every change ever made to it</a>. Or download it, read it, then run it:</p>
     <div class="cmd cmd-small" data-copy-group>
       <div class="cmd-line">
         <code><span class="cmd-prompt" aria-hidden="true">$</span><span data-copy-text>curl -fsSLO https://getsysperf.com/bench &amp;&amp; less bench &amp;&amp; bash bench</span></code>
@@ -138,14 +138,14 @@ Multi Core           : <span class="t-yellow">1229.58</span> (2 threads)</code><
     </div>
 
     <h3 class="step">2. Check that this site serves exactly that version</h3>
-    <p>Compare the script from this site with the same commit on GitHub. They are two independent sources: to hand you a different script, someone would have to compromise both.</p>
+    <p>Compare the script from this site with the same commit in the repository. They run on separate infrastructure (Cloudflare and our own Git server), so to hand you a different script, someone would have to compromise both.</p>
     <div class="cmd cmd-small" data-copy-group>
       <div class="cmd-line">
-        <code><span class="cmd-prompt" aria-hidden="true">$</span><span data-copy-text>diff &lt;(curl -fsSL https://getsysperf.com/bench) &lt;(curl -fsSL https://raw.githubusercontent.com/jacboy/sysperf/__COMMIT__/bench) &amp;&amp; echo "identical"</span></code>
+        <code><span class="cmd-prompt" aria-hidden="true">$</span><span data-copy-text>diff &lt;(curl -fsSL https://getsysperf.com/bench) &lt;(curl -fsSL https://git.gillekyl.de/jay/sysperf/raw/commit/__COMMIT__/bench) &amp;&amp; echo "identical"</span></code>
         <button type="button" class="copy" data-copy>Copy</button>
       </div>
     </div>
-    <p class="muted-note">This shows that the site serves what is public on GitHub, nothing more. Whether you trust the code itself is your call; that's what step 1 is for.</p>
+    <p class="muted-note">This shows that the site serves what is public in the repository, nothing more. Whether you trust the code itself is your call; that's what step 1 is for.</p>
 
     <div class="cards two">
       <article class="card">
@@ -160,7 +160,7 @@ Multi Core           : <span class="t-yellow">1229.58</span> (2 threads)</code><
         <h3>Who it talks to</h3>
         <ul>
           <li><code>ipinfo.io</code> for your ISP and ASN, and <code>ipv6.icanhazip.com</code> for the IPv6 check, over HTTPS.</li>
-          <li>The latency and speed-test hosts listed in the <a href="https://github.com/jacboy/sysperf#network-throughput">README</a>.</li>
+          <li>The latency and speed-test hosts listed in the <a href="https://git.gillekyl.de/jay/sysperf#network-throughput">README</a>.</li>
           <li><code>cdn.geekbench.com</code> and <code>browser.geekbench.com</code>, only with <code>GEEKBENCH=7</code>.</li>
           <li>Nobody else. sysperf collects no data, and this site uses no cookies, analytics or third-party resources.</li>
         </ul>
@@ -171,9 +171,9 @@ Multi Core           : <span class="t-yellow">1229.58</span> (2 threads)</code><
 
 <footer class="site-footer">
   <div class="wrap footer-inner">
-    <span>sysperf __VERSION__ · commit <a href="https://github.com/jacboy/sysperf/tree/__COMMIT__">__COMMIT_SHORT__</a></span>
-    <a href="https://github.com/jacboy/sysperf">Source on GitHub</a>
-    <a href="https://github.com/jacboy/sysperf/issues">Report a problem</a>
+    <span>sysperf __VERSION__ · commit <a href="https://git.gillekyl.de/jay/sysperf/src/commit/__COMMIT__">__COMMIT_SHORT__</a></span>
+    <a href="https://git.gillekyl.de/jay/sysperf">Source</a>
+    <a href="https://git.gillekyl.de/jay/sysperf/issues">Report a problem</a>
   </div>
 </footer>
 <script src="/copy.js"></script>
