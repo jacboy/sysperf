@@ -22,6 +22,19 @@ python3 -m http.server -d dist 8000
 1. Change `bench` and raise `SYSPERF_VERSION` in it.
 2. Merge to `master`. Cloudflare Pages rebuilds the site; the page shows the new version and checksum, and `/bench` serves the new script.
 
+## Test deployment: sysperf.jf-l.de (Cloudron Surfer)
+
+`.github/workflows/deploy-test.yml` builds the site with `SITE_URL=https://sysperf.jf-l.de` (so the commands on the page point to the test instance) and publishes it with `surfer deploy`, which replaces the whole site. It runs on every push to `master` that changes `bench`, `site/` or the workflow, and can be started by hand under *Actions → Deploy test site → Run workflow*. After deploying it checks that the live `/bench` is byte-identical to the build and that the page shows the new version.
+
+One-time setup:
+
+1. In the Cloudron dashboard, *Profile → App passwords*: create an app password for the Surfer app.
+2. In GitHub, *Settings → Secrets and variables → Actions → New repository secret*, add:
+   - `SURFER_USERNAME`: the Cloudron username
+   - `SURFER_APP_PASSWORD`: the app password from step 1
+
+Differences from Cloudflare Pages: Surfer doesn't read `_headers` (the workflow leaves it out), so the test site doesn't get the custom CSP and `/bench` isn't necessarily served as `text/plain`. `curl … | bash` works either way.
+
 ## Cloudflare Pages setup (one-time)
 
 The DNS for getsysperf.com is already on Cloudflare, so everything happens in the same account.
