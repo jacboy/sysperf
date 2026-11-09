@@ -157,10 +157,8 @@ h3 { font-size: 1.05rem; margin: 0 0 8px; }
 .notes { padding-left: 1.1em; color: var(--muted); max-width: 70ch; }
 .notes li + li { margin-top: 6px; }
 
-.hash code {
-  display: block; background: var(--code-bg); border: 1px solid var(--border);
-  border-radius: 6px; padding: 10px 12px; overflow-wrap: anywhere; font-size: 0.85rem;
-}
+h3.step { margin: 28px 0 8px; }
+.muted-note { color: var(--muted); font-size: 0.92rem; max-width: 70ch; }
 
 /* Footer */
 .site-footer { border-top: 1px solid var(--border); margin-top: 32px; }
