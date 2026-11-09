@@ -20,25 +20,14 @@ python3 -m http.server -d dist 8000
 ## Releasing a new version
 
 1. Change `bench` and raise `SYSPERF_VERSION` in it.
-2. Merge to `master`. Cloudflare Pages rebuilds the site; the page shows the new version and checksum, and `/bench` serves the new script.
+2. Merge to `master`. The *Deploy site* GitHub Action (`.github/workflows/deploy.yml`) builds the site, uploads it to Cloudflare Pages and checks that the live `/bench` matches the build. The page then shows the new version and checksum.
 
-## Cloudflare Pages setup (one-time)
+## How it's hosted
 
-The DNS for getsysperf.com is already on Cloudflare, so everything happens in the same account.
-
-1. **Remove old records.** In *DNS → Records*, delete the existing `A` and `AAAA` records for `getsysperf.com` that point to the old Hetzner server, if that server is no longer yours.
-2. **Create the project.** *Workers & Pages → Create → Pages → Connect to Git*, choose `jacboy/sysperf`.
-   - Production branch: `master`
-   - Framework preset: *None*
-   - Build command: `bash site/build.sh`
-   - Build output directory: `dist`
-3. **Check the preview.** After the first deploy, open `https://<project>.pages.dev/` and test:
-   ```bash
-   curl -fsSL https://<project>.pages.dev/bench | head -5
-   curl -sI https://<project>.pages.dev/bench | grep -i content-type
-   ```
-4. **Add the domain.** In the project, *Custom domains → Set up a custom domain → `getsysperf.com`*. Cloudflare creates the DNS record itself. Optionally add `www.getsysperf.com` and redirect it to the apex domain (*Rules → Redirect Rules*).
-5. **Force HTTPS.** *SSL/TLS → Edge Certificates*: enable *Always Use HTTPS*.
+- **Cloudflare Pages project `sysperf`** (Direct Upload) in "Iandavid2000@googlemail.com's Account", which also holds the `getsysperf.com` zone. It's served at `https://sysperf.pages.dev` and, as custom domain, `https://getsysperf.com`.
+- **Deployments come only from GitHub Actions** (`.github/workflows/deploy.yml`), on every push to `master` that changes `bench`, `site/` or the workflow, or by hand under *Actions → Deploy site → Run workflow*.
+- **GitHub secret `CLOUDFLARE_API_TOKEN`:** an account API token with only *Account · Cloudflare Pages · Edit* for that account. No DNS or zone permissions.
+- **DNS:** `getsysperf.com CNAME sysperf.pages.dev`, proxied. The Pages API doesn't create this record by itself; the dashboard does when you add the domain there.
 
 ## Securing the domain
 
@@ -54,7 +43,7 @@ Everyone who runs the one-liner trusts whoever controls this domain, the Cloudfl
   | TXT | `@` | `v=spf1 -all` |
   | TXT | `_dmarc` | `v=DMARC1; p=reject;` |
 
-  and remove the old `MX` record.
+  (The old `A`, `AAAA` and `MX` records have already been removed.)
 
 ## After the domain is live
 
