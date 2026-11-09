@@ -50,16 +50,48 @@ if ! command -v wget >/dev/null || ! command -v fio >/dev/null || ! command -v c
         echo "Please install them first: apt install ca-certificates curl jq fio wget iputils-ping sysbench"
         exit 1
     fi
-    # Read from the terminal: when run as "wget -qO- ... | bash", stdin is the script itself
-    read -n 1 -r -s -p "Please press enter to install the required packages automatically" < /dev/tty
-    echo
+    # Ask on the terminal: when run as "curl ... | bash", stdin is the script itself. Without
+    # a terminal (cron, CI) there is nobody to ask, so don't install anything unasked.
+    if ! { : < /dev/tty; } 2>/dev/null; then
+        echo "No terminal to ask for confirmation. Please install them first:"
+        echo "apt-get install -y ca-certificates curl jq fio wget iputils-ping sysbench"
+        exit 1
+    fi
+    read -r -p "Install the missing packages with apt-get now? [Y/n] " install_answer < /dev/tty
+    case "$install_answer" in
+        ""|[Yy]|[Yy][Ee][Ss]) ;;
+        *)
+            echo "Not installing anything. To install them yourself:"
+            echo "apt-get install -y ca-certificates curl jq fio wget iputils-ping sysbench"
+            exit 1 ;;
+    esac
     apt-get update && apt-get install -y ca-certificates curl jq fio wget iputils-ping sysbench || exit 1
 fi
 
-# Private working directory for the I/O test file and Geekbench. It is created in the
-# current directory so the I/O test still measures that disk, but with an unpredictable
+# The working directory goes into the current directory, so the I/O test measures that
+# disk. That's only safe if no other user can rename anything on the path to it: in a
+# directory that others can write to without the sticky bit (or that another user owns),
+# they could swap our directory for their own and redirect root's writes, or replace the
+# Geekbench binary before it runs. So every directory from / down to here must be owned
+# by root or by us, and must not be group/world-writable unless it has the sticky bit.
+here=$( pwd -P )
+check_dir="$here"
+while :; do
+    dir_mode=$( stat -c '%a' "$check_dir" ) || exit 1
+    dir_owner=$( stat -c '%u' "$check_dir" ) || exit 1
+    if { [ "$dir_owner" != 0 ] && [ "$dir_owner" != "$EUID" ]; } \
+        || { (( 8#$dir_mode & 8#022 )) && ! (( 8#$dir_mode & 8#1000 )); }; then
+        printf 'Error: other users can modify %s, so it is not safe to run the benchmark in %s.\n' "$check_dir" "$here"
+        echo "Please run it from a directory only you (or root) can change, for example: cd ~"
+        exit 1
+    fi
+    [ "$check_dir" = / ] && break
+    check_dir=$( dirname "$check_dir" )
+done
+
+# Private working directory for the I/O test file and Geekbench, with an unpredictable
 # name and mode 0700, so other local users can't pre-plant files or symlinks in it.
-WORKDIR=$( mktemp -d "${PWD}/.sysperf.XXXXXXXX" ) || { echo "Error: cannot create a working directory in ${PWD}"; exit 1; }
+WORKDIR=$( mktemp -d "${here}/.sysperf.XXXXXXXX" ) || { echo "Error: cannot create a working directory in ${here}"; exit 1; }
 trap 'spinner_stop; rm -rf -- "$WORKDIR"' EXIT
 trap 'exit 130' INT TERM
 
@@ -430,18 +462,18 @@ spinner_start "Collecting system information"
 get_netinfo
 get_sys_type
 spinner_stop
-echo -e "System type          : ${BLUE}$sys_type${PLAIN}"
-echo -e "CPU model            : ${BLUE}$cname${PLAIN}"
-echo -e "Number of cores      : ${BLUE}$cores${PLAIN}"
-echo -e "CPU frequency        : ${BLUE}$freq MHz${PLAIN}"
-echo -e "Total size of Disk   : ${BLUE}$disk_total_size GB ($disk_used_size GB Used)${PLAIN}"
-echo -e "Total amount of Mem  : ${BLUE}$tram MB ($uram MB Used)${PLAIN}"
-echo -e "Total amount of Swap : ${BLUE}$swap MB ($uswap MB Used)${PLAIN}"
-echo -e "System uptime        : ${BLUE}$up${PLAIN}"
-echo -e "Load average         : ${BLUE}$load${PLAIN}"
-echo -e "OS                   : ${BLUE}$opsy${PLAIN}"
-echo -e "Arch                 : ${BLUE}$arch ($lbit Bit)${PLAIN}"
-echo -e "Kernel               : ${BLUE}$kern${PLAIN}"
+printf "System type          : ${BLUE}%s${PLAIN}\n" "$sys_type"
+printf "CPU model            : ${BLUE}%s${PLAIN}\n" "$cname"
+printf "Number of cores      : ${BLUE}%s${PLAIN}\n" "$cores"
+printf "CPU frequency        : ${BLUE}%s MHz${PLAIN}\n" "$freq"
+printf "Total size of Disk   : ${BLUE}%s GB (%s GB Used)${PLAIN}\n" "$disk_total_size" "$disk_used_size"
+printf "Total amount of Mem  : ${BLUE}%s MB (%s MB Used)${PLAIN}\n" "$tram" "$uram"
+printf "Total amount of Swap : ${BLUE}%s MB (%s MB Used)${PLAIN}\n" "$swap" "$uswap"
+printf "System uptime        : ${BLUE}%s${PLAIN}\n" "$up"
+printf "Load average         : ${BLUE}%s${PLAIN}\n" "$load"
+printf "OS                   : ${BLUE}%s${PLAIN}\n" "$opsy"
+printf "Arch                 : ${BLUE}%s (%s Bit)${PLAIN}\n" "$arch" "$lbit"
+printf "Kernel               : ${BLUE}%s${PLAIN}\n" "$kern"
 printf "ISP                  : ${BLUE}%s${PLAIN}\n" "$isp"
 printf "ASN                  : ${BLUE}%s${PLAIN}\n" "$as"
 if [[ "$ipv6" != "" ]]; then

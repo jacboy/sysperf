@@ -40,7 +40,7 @@ curl -fsSL https://raw.githubusercontent.com/jacboy/sysperf/master/bench | bash 
 CPU model, cores and frequency; disk size and usage; RAM and swap; uptime and load; OS, architecture and kernel; virtualization type (KVM, LXC, OpenVZ, bare metal…); ISP and ASN; whether IPv6 works.
 
 ### Disk I/O
-Three runs of a 30-second [fio](https://github.com/axboe/fio) test (random read/write 50/50, 512 KB blocks, queue depth 64, 2 jobs, direct I/O, 2 GB file) and their average. The test file is written to **the directory you run the script from**, so run it from the disk you want to measure.
+Three runs of a 30-second [fio](https://github.com/axboe/fio) test (random read/write 50/50, 512 KB blocks, queue depth 64, 2 jobs, direct I/O, 2 GB file) and their average. The test file is written to **the directory you run the script from**, so run it from the disk you want to measure. For safety, the script refuses to run in a directory that other users can modify (for example a shared, group-writable folder); your home directory is fine.
 
 ### Network latency
 Ping to 12 locations: Frankfurt, London, New York, Los Angeles, São Paulo, Santiago, Johannesburg, Mumbai, Singapore, Hong Kong, Tokyo and Sydney. If a host doesn't answer over IPv6, the ping is retried over IPv4.
@@ -86,14 +86,14 @@ About Geekbench:
 ## Requirements
 
 - **OS:** Debian 10 or newer, or Ubuntu 18.04 or newer.
-- **Packages:** `curl`, `wget`, `jq`, `fio`, `ping` (`iputils-ping`) and `sysbench`. If any is missing, the script asks for a key press and installs them with `apt-get`. To install them yourself:
+- **Packages:** `curl`, `wget`, `jq`, `fio`, `ping` (`iputils-ping`) and `sysbench`. If any is missing, the script asks for confirmation (`[Y/n]`) and installs them with `apt-get`. Without a terminal to ask on, it stops and prints the install command instead. To install them yourself:
   ```bash
   apt-get install -y ca-certificates curl wget jq fio iputils-ping sysbench
   ```
   On Ubuntu, `sysbench` is in the `universe` repository, which is enabled on standard installations.
 - **Root:** only needed if packages have to be installed. With all packages present, the script runs as a normal user.
 - **Disk:** about 2 GB free in the current directory for the I/O test file, plus 1.5 GB for Geekbench if requested.
-- **Runs without a terminal** too (cron, CI), just without the spinner.
+- **Runs without a terminal** too (cron, CI), just without the spinner. Install the packages beforehand in that case.
 
 ## Security and privacy
 
@@ -195,6 +195,7 @@ Full result          : https://browser.geekbench.com/v7/cpu/841458
 - **A speed or latency row shows `failed`:** that host didn't answer in time or refused the download. Test hosts come and go; please open an issue if one fails consistently.
 - **Results vary between runs:** far-away hosts depend on routing and the remote server's load. Run the script twice before drawing conclusions.
 - **"Couldn't find […]" and the script exits:** run it as root to install the missing packages, or install them yourself (see [Requirements](#requirements)).
+- **"other users can modify …" and the script exits:** run it from a directory only you or root can change, for example `cd ~`.
 - **Geekbench is skipped:** check the message; it needs 1.5 GB free disk, 2 GB RAM and an x86_64 or ARM CPU.
 
 ## Donation
