@@ -301,6 +301,11 @@ geekbench() {
 	local gbout="$WORKDIR/geekbench.out"
 
 	[ -n "$reason" ] && echo "Using Geekbench ${major}: ${reason}"
+	# TODO: disable the upload to the public Geekbench Browser (to be fixed with the next
+	# changes to the script). The free Geekbench 6/7 CLI has no option for this: `geekbench7
+	# --help` only lists --unlock EMAIL KEY, --cpu and --sysinfo. Offline runs most likely
+	# need a Geekbench Pro license (--unlock); verify before implementing. The scores are
+	# already read from the local output, so nothing else depends on the upload.
 	echo "Note: Geekbench uploads the result and basic system information to the public Geekbench Browser."
 
 	spinner_start "Downloading Geekbench ${version}"
