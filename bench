@@ -153,42 +153,65 @@ next() {
 }
 
 speed_test() {
-    # One attempt; give up on an unreachable address after 5s (wget then tries the host's
-    # next address, e.g. IPv4 when the host's IPv6 is dead) and on a stalled transfer after 30s
-    spinner_start "Downloading 100 MB from $2"
-    local output=$(LANG=C wget -O /dev/null -t1 --connect-timeout=5 --read-timeout=30 "$1" 2>&1)
+    # Fetch the first 100 MB (range request, so 1 GB test files work too), at most 15s per
+    # host; the speed is averaged over what arrived. curl falls back from a dead IPv6
+    # address to IPv4 quickly (happy eyeballs).
+    spinner_start "Downloading from $2"
+    local result code bytes bps speed
+    result=$(curl -s -o /dev/null -r 0-104857599 --connect-timeout 5 --max-time 15 \
+        -w '%{http_code} %{size_download} %{speed_download}' "$1" 2>/dev/null)
     spinner_stop
-    local speedtest=$(printf '%s' "$output" | awk '/\/dev\/null/ {speed=$3 $4} END {gsub(/\(|\)/,"",speed); print speed}')
-    [ -z "$speedtest" ] && speedtest="failed"
-    local nodeName=$2
-    printf "${YELLOW}%-32s${GREEN}%-24s${RED}%-14s${PLAIN}\n" "${nodeName}" "${speedtest}"
+    read -r code bytes bps <<< "$result"
+    if { [ "$code" = 200 ] || [ "$code" = 206 ]; } && [ "${bytes%.*}" -gt 1048576 ] 2>/dev/null; then
+        speed=$(awk -v b="$bps" 'BEGIN { if (b >= 1048576) printf "%.1f MB/s", b / 1048576; else printf "%.0f KB/s", b / 1024 }')
+    else
+        speed="failed"
+    fi
+    printf "${YELLOW}%-32s${GREEN}%-24s${RED}%-14s${PLAIN}\n" "$2" "$speed"
 }
 
 speed_result() {
     region 'Europe'
-    speed_test 'https://fra-de-ping.vultr.com/vultr.com.100MB.bin' 'Frankfurt, Vultr'
-    speed_test 'http://fsn.icmp.hetzner.com/100MB.bin' 'Falkenstein, Hetzner'
+    speed_test 'http://speedtest.fra1.de.leaseweb.net/100mb.bin' 'Frankfurt, Leaseweb'
     speed_test 'https://nbg1-speed.hetzner.com/100MB.bin' 'Nuremberg, Hetzner'
+    speed_test 'http://speedtest.belwue.net/100M' 'Stuttgart, BelWue'
+    speed_test 'https://speedtest.init7.net/1GB.dd' 'Zurich, Init7'
+    speed_test 'http://speedtest.ams1.nl.leaseweb.net/100mb.bin' 'Amsterdam, Leaseweb'
+    speed_test 'http://speedtest.lon1.uk.leaseweb.net/100mb.bin' 'London, Leaseweb'
+    speed_test 'http://ping.online.net/100Mo.dat' 'Paris, Scaleway'
+    speed_test 'https://proof.ovh.net/files/1Gb.dat' 'Roubaix, OVH'
     speed_test 'http://hel.icmp.hetzner.com/100MB.bin' 'Helsinki, Hetzner'
-    speed_test 'https://ams-nl-ping.vultr.com/vultr.com.100MB.bin' 'Amsterdam, Vultr'
-    speed_test 'https://ams.lg.core-backbone.com/files/100MB.test' 'Amsterdam, Core-Backbone'
-    speed_test 'https://lon-gb-ping.vultr.com/vultr.com.100MB.bin' 'London, Vultr'
-    speed_test 'https://par-fr-ping.vultr.com/vultr.com.100MB.bin' 'Paris, Vultr'
+    speed_test 'https://sto-se-ping.vultr.com/vultr.com.100MB.bin' 'Stockholm, Vultr'
+    speed_test 'https://waw-pl-ping.vultr.com/vultr.com.100MB.bin' 'Warsaw, Vultr'
+    speed_test 'https://mad-es-ping.vultr.com/vultr.com.100MB.bin' 'Madrid, Vultr'
     region 'North America'
-    speed_test 'https://nj-us-ping.vultr.com/vultr.com.100MB.bin' 'New Jersey, Vultr'
+    speed_test 'http://speedtest.nyc1.us.leaseweb.net/100mb.bin' 'New York, Leaseweb'
     speed_test 'http://ash.icmp.hetzner.com/100MB.bin' 'Ashburn, Hetzner'
-    speed_test 'https://tx-us-ping.vultr.com/vultr.com.100MB.bin' 'Texas, Vultr'
-    speed_test 'https://sjo-ca-us-ping.vultr.com/vultr.com.100MB.bin' 'Silicon Valley, Vultr'
+    speed_test 'https://tor-ca-ping.vultr.com/vultr.com.100MB.bin' 'Toronto, Vultr'
+    speed_test 'https://il-us-ping.vultr.com/vultr.com.100MB.bin' 'Chicago, Vultr'
+    speed_test 'http://speedtest.dal13.us.leaseweb.net/100mb.bin' 'Dallas, Leaseweb'
+    speed_test 'http://speedtest.mia11.us.leaseweb.net/100mb.bin' 'Miami, Leaseweb'
+    speed_test 'https://mex-mx-ping.vultr.com/vultr.com.100MB.bin' 'Mexico City, Vultr'
+    speed_test 'http://speedtest.lax12.us.leaseweb.net/100mb.bin' 'Los Angeles, Leaseweb'
+    speed_test 'https://hil-speed.hetzner.com/100MB.bin' 'Hillsboro, Hetzner'
     region 'South America'
     speed_test 'https://sao-br-ping.vultr.com/vultr.com.100MB.bin' 'Sao Paulo, Vultr'
+    speed_test 'https://scl-cl-ping.vultr.com/vultr.com.100MB.bin' 'Santiago, Vultr'
     region 'Africa'
     speed_test 'https://jnb-za-ping.vultr.com/vultr.com.100MB.bin' 'Johannesburg, Vultr'
     region 'Asia'
-    speed_test 'https://sgp-ping.vultr.com/vultr.com.100MB.bin' 'Singapore, Vultr'
-    speed_test 'https://hnd-jp-ping.vultr.com/vultr.com.100MB.bin' 'Tokyo, Vultr'
+    speed_test 'https://tlv-il-ping.vultr.com/vultr.com.100MB.bin' 'Tel Aviv, Vultr'
+    speed_test 'https://del-in-ping.vultr.com/vultr.com.100MB.bin' 'Delhi, Vultr'
     speed_test 'https://bom-in-ping.vultr.com/vultr.com.100MB.bin' 'Mumbai, Vultr'
+    speed_test 'https://sin-speed.hetzner.com/100MB.bin' 'Singapore, Hetzner'
+    speed_test 'http://speedtest.hkg12.hk.leaseweb.net/100mb.bin' 'Hong Kong, Leaseweb'
+    speed_test 'http://speedtest.tyo11.jp.leaseweb.net/100mb.bin' 'Tokyo, Leaseweb'
+    speed_test 'https://sel-kor-ping.vultr.com/vultr.com.100MB.bin' 'Seoul, Vultr'
     region 'Oceania'
-    speed_test 'https://syd-au-ping.vultr.com/vultr.com.100MB.bin' 'Sydney, Vultr'
+    speed_test 'http://speedtest.syd12.au.leaseweb.net/100mb.bin' 'Sydney, Leaseweb'
+    speed_test 'https://mel-au-ping.vultr.com/vultr.com.100MB.bin' 'Melbourne, Vultr'
+    region 'Global (nearest CDN node)'
+    speed_test 'http://cachefly.cachefly.net/100mb.test' 'CacheFly'
 }
 
 # Continent heading for the latency and speed tables
@@ -210,19 +233,23 @@ ping_test() {
 
 ping_result() {
   region 'Europe'
-  ping_test 'fra-de-ping.vultr.com' 'Frankfurt'
+  ping_test 'speedtest.fra1.de.leaseweb.net' 'Frankfurt'
+  ping_test 'speedtest.lon1.uk.leaseweb.net' 'London'
   region 'North America'
-  ping_test 'nj-us-ping.vultr.com' 'New Jersey'
-  ping_test 'sjo-ca-us-ping.vultr.com' 'Silicon Valley'
+  ping_test 'speedtest.nyc1.us.leaseweb.net' 'New York'
+  ping_test 'speedtest.lax12.us.leaseweb.net' 'Los Angeles'
   region 'South America'
   ping_test 'sao-br-ping.vultr.com' 'Sao Paulo'
+  ping_test 'scl-cl-ping.vultr.com' 'Santiago'
   region 'Africa'
   ping_test 'jnb-za-ping.vultr.com' 'Johannesburg'
   region 'Asia'
-  ping_test 'sgp-ping.vultr.com' 'Singapore'
-  ping_test 'hnd-jp-ping.vultr.com' 'Tokyo'
+  ping_test 'bom-in-ping.vultr.com' 'Mumbai'
+  ping_test 'sin-speed.hetzner.com' 'Singapore'
+  ping_test 'speedtest.hkg12.hk.leaseweb.net' 'Hong Kong'
+  ping_test 'speedtest.tyo11.jp.leaseweb.net' 'Tokyo'
   region 'Oceania'
-  ping_test 'syd-au-ping.vultr.com' 'Sydney'
+  ping_test 'speedtest.syd12.au.leaseweb.net' 'Sydney'
 }
 
 io_test() {
