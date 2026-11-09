@@ -5,33 +5,37 @@ A benchmark script for Debian and Ubuntu servers. One command shows the system's
 ## Quick start
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/jacboy/sysperf/master/bench | bash
+curl -fsSL https://getsysperf.com/bench | bash
 ```
 
 or with `wget`:
 
 ```bash
-wget -qO- https://raw.githubusercontent.com/jacboy/sysperf/master/bench | bash
+wget -qO- https://getsysperf.com/bench | bash
 ```
 
 A run takes about 8–10 minutes (15–20 with Geekbench). A spinner shows which step is running.
+
+More on [getsysperf.com](https://getsysperf.com). The script is also available straight from this repository at `https://raw.githubusercontent.com/jacboy/sysperf/master/bench`; both serve the same `master` version.
 
 ### Read the script before running it
 
 Piping a script from the internet into bash means trusting it. If you'd rather check what it does first:
 
 ```bash
-wget https://raw.githubusercontent.com/jacboy/sysperf/master/bench
+wget https://getsysperf.com/bench
 less bench
 bash bench
 ```
+
+The SHA-256 of the current version is published at [getsysperf.com/bench.sha256](https://getsysperf.com/bench.sha256).
 
 ### Keep a log
 
 The spinner is drawn on the terminal only, so the log contains just the results:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/jacboy/sysperf/master/bench | bash 2>&1 | tee ~/sysperf.log
+curl -fsSL https://getsysperf.com/bench | bash 2>&1 | tee ~/sysperf.log
 ```
 
 ## What it measures
@@ -75,7 +79,7 @@ Options are set as environment variables. When piping the script into bash, put 
 | `GEEKBENCH=7` | Also run Geekbench 7.1.0 (x86_64 and ARM). |
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/jacboy/sysperf/master/bench | GEEKBENCH=7 bash
+curl -fsSL https://getsysperf.com/bench | GEEKBENCH=7 bash
 ```
 
 About Geekbench:

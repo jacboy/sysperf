@@ -44,7 +44,3 @@ Everyone who runs the one-liner trusts whoever controls this domain, the Cloudfl
   | TXT | `_dmarc` | `v=DMARC1; p=reject;` |
 
   (The old `A`, `AAAA` and `MX` records have already been removed.)
-
-## After the domain is live
-
-Switch the commands in the main [README](../README.md) from `raw.githubusercontent.com/jacboy/sysperf/master/bench` to `https://getsysperf.com/bench`.

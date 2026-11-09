@@ -77,11 +77,13 @@ jobs:
           expected=$(cut -d' ' -f1 dist/bench.sha256)
           version=$(sed -n 's/^SYSPERF_VERSION="\([^"]*\)"$/\1/p' bench)
           check() {
-            local base=$1 live attempt
+            local base=$1 live page attempt
             for attempt in 1 2 3 4 5 6; do
               live=$(curl -fsS --proto '=https' "${base}/bench" | sha256sum | cut -d' ' -f1) || live=""
-              if [ "$live" = "$expected" ] \
-                && curl -fsS --proto '=https' "${base}/" | grep -q "Version ${version}"; then
+              # Fetch the page completely before searching it: "curl | grep -q" can fail under
+              # pipefail when grep exits early and curl can no longer write (curl error 23).
+              page=$(curl -fsS --proto '=https' "${base}/") || page=""
+              if [ "$live" = "$expected" ] && grep -qF "Version ${version}" <<< "$page"; then
                 return 0
               fi
               echo "${base}: attempt ${attempt}, /bench checksum '${live}', expected ${expected}; retrying"
