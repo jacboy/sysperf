@@ -57,7 +57,13 @@ if ! command -v wget >/dev/null || ! command -v fio >/dev/null || ! command -v c
         echo "apt-get install -y ca-certificates curl jq fio wget iputils-ping sysbench"
         exit 1
     fi
-    read -r -p "Install the missing packages with apt-get now? [Y/n] " install_answer < /dev/tty
+    # A failed read (Ctrl+D, closed terminal) is not a yes: only an actual Enter counts
+    if ! read -r -p "Install the missing packages with apt-get now? [Y/n] " install_answer < /dev/tty; then
+        echo
+        echo "No answer, not installing anything. To install them yourself:"
+        echo "apt-get install -y ca-certificates curl jq fio wget iputils-ping sysbench"
+        exit 1
+    fi
     case "$install_answer" in
         ""|[Yy]|[Yy][Ee][Ss]) ;;
         *)
