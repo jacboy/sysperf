@@ -462,7 +462,7 @@ disk_used_size=$( calc_disk "${disk_size2[@]}" )
 
 clear
 next
-echo -e "${RED}getsysperf.com${PLAIN} v${SYSPERF_VERSION} -- ${YELLOW}https://github.com/jacboy/sysperf${PLAIN}"
+echo -e "${RED}getsysperf.com${PLAIN} v${SYSPERF_VERSION} -- ${YELLOW}https://git.gillekyl.de/jay/sysperf${PLAIN}"
 next
 spinner_start "Collecting system information"
 get_netinfo

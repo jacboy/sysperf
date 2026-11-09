@@ -16,7 +16,7 @@ wget -qO- https://getsysperf.com/bench | bash
 
 A run takes about 8–10 minutes (15–20 with Geekbench). A spinner shows which step is running.
 
-More on [getsysperf.com](https://getsysperf.com). The script is also available straight from this repository at `https://raw.githubusercontent.com/jacboy/sysperf/master/bench`; both serve the same `master` version.
+More on [getsysperf.com](https://getsysperf.com). The source lives at [git.gillekyl.de/jay/sysperf](https://git.gillekyl.de/jay/sysperf) (mirrored to [github.com/jacboy/sysperf](https://github.com/jacboy/sysperf)). The script is also available straight from the repository at `https://git.gillekyl.de/jay/sysperf/raw/branch/master/bench`; both serve the same `master` version.
 
 ### Read the script before running it
 
@@ -31,7 +31,7 @@ bash bench
 To check that getsysperf.com serves exactly the script in this repository, compare the two. No output other than "identical" means they match:
 
 ```bash
-diff <(curl -fsSL https://getsysperf.com/bench) <(curl -fsSL https://raw.githubusercontent.com/jacboy/sysperf/master/bench) && echo "identical"
+diff <(curl -fsSL https://getsysperf.com/bench) <(curl -fsSL https://git.gillekyl.de/jay/sysperf/raw/branch/master/bench) && echo "identical"
 ```
 
 The site deploys every push to `master` within a minute or two, so the two can briefly differ right after a change.
@@ -119,7 +119,7 @@ From a Debian 13 KVM server with 2 vCPUs in Frankfurt, run with `GEEKBENCH=7` (I
 
 ```
 -----
-getsysperf.com v2.0.0 -- https://github.com/jacboy/sysperf
+getsysperf.com v2.0.0 -- https://git.gillekyl.de/jay/sysperf
 -----
 System type          : KVM
 CPU model            : AMD EPYC 7702 64-Core Processor
