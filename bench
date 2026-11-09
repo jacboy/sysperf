@@ -4,6 +4,13 @@
 # A simple benchmark script to test your Disk, Network and CPU performance
 #
 
+SYSPERF_VERSION="2.0.0"
+
+# Everything below runs inside main(), which is only called on the very last line. If the
+# download breaks off while the script is piped into bash ("curl ... | bash"), bash sees an
+# incomplete function and runs nothing, instead of running the first half of the script.
+main() {
+
 
 #
 #
@@ -417,7 +424,7 @@ disk_used_size=$( calc_disk "${disk_size2[@]}" )
 
 clear
 next
-echo -e "${RED}getsysperf.com${PLAIN} -- ${YELLOW}https://github.com/iandk/sysperf${PLAIN}"
+echo -e "${RED}getsysperf.com${PLAIN} v${SYSPERF_VERSION} -- ${YELLOW}https://github.com/jacboy/sysperf${PLAIN}"
 next
 spinner_start "Collecting system information"
 get_netinfo
@@ -473,3 +480,6 @@ if [ -n "${GEEKBENCH:-}" ] && [ "$GEEKBENCH" != "0" ]; then
     geekbench
     next
 fi
+}
+
+main "$@"
