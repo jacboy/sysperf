@@ -111,8 +111,11 @@ next() {
 }
 
 speed_test() {
-    local output=$(LANG=C wget -O /dev/null -T30 $1 2>&1)
+    # One attempt; give up on an unreachable address after 5s (wget then tries the host's
+    # next address, e.g. IPv4 when the host's IPv6 is dead) and on a stalled transfer after 30s
+    local output=$(LANG=C wget -O /dev/null -t1 --connect-timeout=5 --read-timeout=30 "$1" 2>&1)
     local speedtest=$(printf '%s' "$output" | awk '/\/dev\/null/ {speed=$3 $4} END {gsub(/\(|\)/,"",speed); print speed}')
+    [ -z "$speedtest" ] && speedtest="failed"
     local nodeName=$2
     printf "${YELLOW}%-32s${GREEN}%-24s${RED}%-14s${PLAIN}\n" "${nodeName}" "${speedtest}"
 }
@@ -138,8 +141,10 @@ speed_result() {
 
 ping_test() {
     local nodename=$2
-    local output=$(ping -w 2 $1 | grep rtt | cut -d'/' -f4 | awk '{ print $3 }')
-    local output="$output ms"
+    local output=$(ping -w 2 "$1" 2>/dev/null | grep rtt | cut -d'/' -f4 | awk '{ print $3 }')
+    # Some test hosts publish an IPv6 address that doesn't answer; retry over IPv4
+    [ -z "$output" ] && output=$(ping -4 -w 2 "$1" 2>/dev/null | grep rtt | cut -d'/' -f4 | awk '{ print $3 }')
+    if [ -n "$output" ]; then output="$output ms"; else output="failed"; fi
     printf "${YELLOW}%-32s${GREEN}%-24s${RED}%-14s${PLAIN}\n" "${nodename}" "${output}"
 }
 
