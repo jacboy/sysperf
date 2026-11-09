@@ -24,14 +24,9 @@ apt install dialog ca-certificates jq curl fio wget iputils-ping sysbench
 ### CPU benchmark
 By default the CPU is benchmarked with [sysbench](https://github.com/akopytov/sysbench) from your distribution's own packages: a small download, and nothing is uploaded anywhere.
 
-Optionally, the script can also run [Geekbench](https://www.geekbench.com/) (x86_64 and ARM). It is only downloaded when you ask for it:
+Optionally, the script can also run [Geekbench 7](https://www.geekbench.com/) (x86_64 and ARM). It is only downloaded when you ask for it with `GEEKBENCH=7`. It's a 462 MB download and needs about 1.5 GB of free disk space while it runs; with less, it is skipped.
 
-| Variable | Effect |
-|---|---|
-| `GEEKBENCH=7` | Also run Geekbench 7 (462 MB download, needs ~1.5 GB free disk; falls back to Geekbench 6 with less) |
-| `GEEKBENCH=6` | Also run Geekbench 6 (218 MB download, needs ~0.8 GB free disk) |
-
-The free Geekbench versions upload their result to the public [Geekbench Browser](https://browser.geekbench.com/).
+The free Geekbench version uploads its result to the public [Geekbench Browser](https://browser.geekbench.com/).
 
 When piping the script into bash, put the variable in front of `bash`, not `wget`:
 ```

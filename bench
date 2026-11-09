@@ -276,21 +276,18 @@ cpu_bench() {
 	printf "Multi Core           : ${YELLOW}%s${PLAIN} (%s threads)\n" "${multi:-failed}" "$threads"
 }
 
-# Optional Geekbench CPU benchmark, only downloaded and run when requested:
-#   GEEKBENCH=7 (or 1)  Geekbench 7; falls back to Geekbench 6 with less than 1.5 GB free disk
-#   GEEKBENCH=6         Geekbench 6
-# Geekbench 7 needs ~1.5 GB free disk while running, Geekbench 6 ~0.8 GB.
+# Optional Geekbench 7 CPU benchmark, only downloaded and run when GEEKBENCH=7 (or 1) is set.
+# It needs ~1.5 GB free disk while running (462 MB tarball + 963 MB extracted).
+# Geekbench 6 is not offered: its free version shows no scores locally, only after the
+# upload to the Geekbench Browser, and that upload failed in testing.
 GB7_MIN_FREE_MB=1536
-GB6_MIN_FREE_MB=800
 
 geekbench() {
-	local force6=0
 	case "${GEEKBENCH:-}" in
 		""|0) return 0 ;;
 		1|7)  ;;
-		6)    force6=1 ;;
 		*)
-			printf "Geekbench            : skipped (unknown GEEKBENCH value '%s', use 6 or 7)\n" "$GEEKBENCH"
+			printf "Geekbench            : skipped (unknown GEEKBENCH value '%s', use GEEKBENCH=7)\n" "$GEEKBENCH"
 			return 0 ;;
 	esac
 
@@ -311,19 +308,10 @@ geekbench() {
 			return 0 ;;
 	esac
 
-	local free_mb version reason=""
+	local free_mb version="7.1.0"
 	free_mb=$(df -Pm "$WORKDIR" | awk 'NR==2 {print $4}')
-	if [ "$force6" = 0 ] && [ "$free_mb" -ge "$GB7_MIN_FREE_MB" ]; then
-		version="7.1.0"
-	elif [ "$free_mb" -ge "$GB6_MIN_FREE_MB" ]; then
-		version="6.6.0"
-		if [ "$force6" = 1 ]; then
-			reason="GEEKBENCH=6 is set"
-		else
-			reason="only ${free_mb} MB free disk, Geekbench 7 needs 1.5 GB"
-		fi
-	else
-		echo "Geekbench            : skipped (only ${free_mb} MB free disk, at least ${GB6_MIN_FREE_MB} MB is required)"
+	if [ "$free_mb" -lt "$GB7_MIN_FREE_MB" ]; then
+		echo "Geekbench            : skipped (only ${free_mb} MB free disk, Geekbench 7 needs 1.5 GB)"
 		return 0
 	fi
 
@@ -332,8 +320,6 @@ geekbench() {
 	case "${version}-${suffix}" in
 		7.1.0-Linux)           sha256="411b72a9c851b69e6f91d390649d419e2e625f475e3983880169651ca27a8672" ;;
 		7.1.0-LinuxARMPreview) sha256="bb6abc61a68a9b33fecf1f3c0b800050dd76e93666a13eaabfa52cbd26ad3319" ;;
-		6.6.0-Linux)           sha256="c94510f3658cd31d55bbc5feb21aef19f5a34ff4036f789643c0dc212104b0e7" ;;
-		6.6.0-LinuxARMPreview) sha256="86ffc902cc4d1279d97122de97563020ba65d7909593646a230d77b8e4dccf68" ;;
 	esac
 
 	local major=${version%%.*}
@@ -342,13 +328,12 @@ geekbench() {
 	local gbdir="$WORKDIR/geekbench"
 	local gbout="$WORKDIR/geekbench.out"
 
-	[ -n "$reason" ] && echo "Using Geekbench ${major}: ${reason}"
 	# TODO: disable the upload to the public Geekbench Browser (to be fixed with the next
 	# changes to the script). Geekbench only runs when GEEKBENCH is set, but then the free
 	# version always uploads: `geekbench7 --help` only lists --unlock EMAIL KEY, --cpu and
-	# --sysinfo, and Geekbench 6 prints "Upgrade to Geekbench 6 Pro to enable offline use".
-	# So it needs a user-supplied Pro license (--unlock). The scores are already read from
-	# the local output, so nothing else depends on the upload.
+	# --sysinfo, and Primate Labs requires Geekbench Pro for offline use. So it needs a
+	# user-supplied Pro license (--unlock). The scores are already read from the local
+	# output, so nothing else depends on the upload.
 	echo "Note: Geekbench uploads the result and basic system information to the public Geekbench Browser."
 
 	spinner_start "Downloading Geekbench ${version}"
